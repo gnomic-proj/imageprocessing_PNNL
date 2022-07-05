@@ -267,6 +267,27 @@ class Image(object):
             self.__reflectance_image = self.radiance()
         return self.__reflectance_image
 
+    #TODO Ilan version using spectral instead of horizontal irradiance
+    # adapted ad hoc, not for every usecase
+    # change is (currently) line 281, using self.spectral_irradiance instead
+    def reflectance_spectral(self, irradiance=None, force_recompute=False):
+        ''' Lazy-compute and return a reflectance image provided an irradiance reference '''
+        if self.__reflectance_image is not None \
+            and force_recompute == False \
+            and (self.__reflectance_irradiance == irradiance or irradiance == None):
+            return self.__reflectance_image
+        if irradiance is None and self.band_name != 'LWIR':
+            if self.horizontal_irradiance != 0.0:
+                irradiance = self.spectral_irradiance
+            else:
+                raise RuntimeError("Provide a band-specific spectral irradiance to compute reflectance")
+        if self.band_name != 'LWIR':
+            self.__reflectance_irradiance = irradiance
+            self.__reflectance_image = self.radiance() * math.pi / irradiance
+        else:
+            self.__reflectance_image = self.radiance()
+        return self.__reflectance_image
+
     def intensity(self, force_recompute=False):
         ''' Lazy=computes and returns the intensity image after black level,
             vignette, and row correction applied.
@@ -355,6 +376,10 @@ class Image(object):
 
     def undistorted_reflectance(self, irradiance=None, force_recompute=False):
         return self.undistorted(self.reflectance(irradiance, force_recompute))
+
+    #TODO Ilan version using spectral instead of horizontal irradiance
+    def undistorted_reflectance_spectral(self, irradiance=None, force_recompute=False):
+        return self.undistorted(self.reflectance_spectral(irradiance, force_recompute))
 
     def plottable_vignette(self):
         return self.vignette()[0].T

@@ -283,6 +283,34 @@ def aligned_capture(capture, warp_matrices, warp_mode, cropped_dimensions, match
 
     return im_cropped
 
+#TODO Ilan version using spectral instead of horizontal irradiance
+#apply homography to create an aligned stack
+def aligned_capture_spectral(capture, warp_matrices, warp_mode, cropped_dimensions, match_index, img_type = 'reflectance',interpolation_mode=cv2.INTER_LANCZOS4):
+    width, height = capture.images[0].size()
+
+    im_aligned = np.zeros((height,width,len(warp_matrices)), dtype=np.float32 )
+
+    for i in range(0,len(warp_matrices)):
+        if img_type == 'reflectance':
+            img = capture.images[i].undistorted_reflectance_spectral()
+        else:
+            img = capture.images[i].undistorted_radiance()
+
+        if warp_mode != cv2.MOTION_HOMOGRAPHY:
+            im_aligned[:,:,i] = cv2.warpAffine(img,
+                                            warp_matrices[i],
+                                            (width,height),
+                                            flags=interpolation_mode + cv2.WARP_INVERSE_MAP)
+        else:
+            im_aligned[:,:,i] = cv2.warpPerspective(img,
+                                                warp_matrices[i],
+                                                (width,height),
+                                                flags=interpolation_mode + cv2.WARP_INVERSE_MAP)
+    (left, top, w, h) = tuple(int(i) for i in cropped_dimensions)
+    im_cropped = im_aligned[top:top+h, left:left+w][:]
+
+    return im_cropped
+
 class BoundPoint(object):
     def __init__(self, x=0, y=0):
         self.x = x
@@ -405,7 +433,7 @@ def min_max(pts):
 
 def map_points(pts, image_size, warpMatrix, distortion_coeffs, camera_matrix,warp_mode=cv2.MOTION_HOMOGRAPHY):
     # extra dimension makes opencv happy
-    pts = np.array([pts], dtype=np.float)
+    pts = np.array([pts], dtype=float)
     new_cam_mat, _ = cv2.getOptimalNewCameraMatrix(camera_matrix, distortion_coeffs, image_size, 1)
     new_pts = cv2.undistortPoints(pts, camera_matrix, distortion_coeffs, P=new_cam_mat)
     if warp_mode == cv2.MOTION_AFFINE:

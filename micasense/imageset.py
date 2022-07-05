@@ -185,6 +185,71 @@ class ImageSet(object):
         if progress_callback is not None:
             progress_callback(1.0)
         return cls(captures)
+    
+    
+    @classmethod # added by ILAN
+    def from_grouplist(cls, grouplist, progress_callback=None, use_tqdm=False, exiftool_path=None):
+        """
+        Create an ImageSet recursively from the files in a directory.
+        :param directory: str system file path
+        :param progress_callback: function to report progress to
+        :param use_tqdm: boolean True to use tqdm progress bar
+        :param exiftool_path: str system file path to exiftool location
+        :return: ImageSet instance
+        """
+
+        # progress_callback deprecation warning
+        if progress_callback is not None:
+            warnings.warn(message='The progress_callback parameter will be deprecated in favor of use_tqdm',
+                          category=PendingDeprecationWarning)
+
+        # ensure exiftoolpath is found per MicaSense setup instructions
+        if exiftool_path is None and os.environ.get('exiftoolpath') is not None:
+            exiftool_path = os.path.normpath(os.environ.get('exiftoolpath'))
+
+        #cls.basedir = directory
+        matches = grouplist
+        # for root, _, filenames in os.walk(directory):
+        #     [matches.append(os.path.join(root, filename)) for filename in fnmatch.filter(filenames, '*.tif')]
+
+        images = []
+
+        with exiftool.ExifTool(exiftool_path) as exift:
+            if use_tqdm:  # to use tqdm progress bar instead of progress_callback
+                kwargs = {
+                    'total': len(matches),
+                    'unit': ' Files',
+                    'unit_scale': False,
+                    'leave': True
+                }
+                for path in tqdm(iterable=matches, desc='Loading ImageSet', **kwargs):
+                    images.append(image.Image(path, exiftool_obj=exift))
+            else:
+                print('Loading ImageSet from list')
+                for i, path in enumerate(matches):
+                    images.append(image.Image(path, exiftool_obj=exift))
+                    if progress_callback is not None:
+                        progress_callback(float(i) / float(len(matches)))
+
+        # create a dictionary to index the images so we can sort them into captures
+        # {
+        #     "capture_id": [img1, img2, ...]
+        # }
+        captures_index = {}
+        for img in images:
+            c = captures_index.get(img.capture_id)
+            if c is not None:
+                c.append(img)
+            else:
+                captures_index[img.capture_id] = [img]
+        captures = []
+        for cap_imgs in captures_index:
+            imgs = captures_index[cap_imgs]
+            newcap = capture.Capture(imgs)
+            captures.append(newcap)
+        if progress_callback is not None:
+            progress_callback(1.0)
+        return cls(captures)
 
     def as_nested_lists(self):
         """

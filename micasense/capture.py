@@ -499,6 +499,43 @@ class Capture(object):
                                                             img_type=img_type)
         return self.__aligned_capture
 
+    
+    # TODO Ilan version using spectral instead of horizontal irradiance
+    # modification traces through three alternate methods:
+    # (1) here we call aligned_capture_spectral in imageutils.py script
+    # (2) 1 calls undistorted_reflectance_spectral in image.py script
+    # (3) 2 calls reflectance_spectral also in image.py script
+    def create_aligned_capture_spectral(self, irradiance_list=None, warp_matrices=None, normalize=False, img_type=None,
+                               motion_type=cv2.MOTION_HOMOGRAPHY):
+        """
+        Creates aligned Capture. Computes undistorted radiance or reflectance images if necessary.
+        :param irradiance_list: List of mean panel region irradiance.
+        :param warp_matrices: 2d List of warp matrices derived from Capture.get_warp_matrices()
+        :param normalize: FIXME: This parameter isn't used?
+        :param img_type: str 'radiance' or 'reflectance' depending on image metadata.
+        :param motion_type: OpenCV import. Also know as warp_mode. MOTION_HOMOGRAPHY or MOTION_AFFINE.
+                            For Altum images only use HOMOGRAPHY.
+        :return: ndarray with alignment changes
+        """
+        if img_type is None and irradiance_list is None and self.dls_irradiance() is None:
+            self.compute_undistorted_radiance()
+            img_type = 'radiance'
+        elif img_type is None:
+            if irradiance_list is None:
+                irradiance_list = self.dls_irradiance() + [0]
+            self.compute_undistorted_reflectance(irradiance_list)
+            img_type = 'reflectance'
+        if warp_matrices is None:
+            warp_matrices = self.get_warp_matrices()
+        cropped_dimensions, _ = imageutils.find_crop_bounds(self, warp_matrices, warp_mode=motion_type)
+        self.__aligned_capture = imageutils.aligned_capture_spectral(self,
+                                                            warp_matrices,
+                                                            motion_type,
+                                                            cropped_dimensions,
+                                                            None,
+                                                            img_type=img_type)
+        return self.__aligned_capture
+
     def aligned_shape(self):
         """
         Get aligned_capture ndarray shape.
@@ -551,6 +588,169 @@ class Capture(object):
                 out_band.FlushCache()
         finally:
             out_raster = None
+    
+    # TODO added by ILAN, adds overviews and statistics and excluding LWIR option
+    def save_capture_as_stack_alt(self, out_file_name, sort_by_wavelength=True, photometric='MINISBLACK', lwir=True):
+        """
+        Output the Images in the Capture object as GTiff image stack.
+        :param out_file_name: str system file path
+        :param sort_by_wavelength: boolean
+        :param photometric: str GDAL argument for GTiff color matching
+        """
+        from osgeo.gdal import GetDriverByName, GDT_UInt16
+        if self.__aligned_capture is None:
+            raise RuntimeError("Call Capture.create_aligned_capture() prior to saving as stack.")
+
+        rows, cols, bands = self.__aligned_capture.shape
+        driver = GetDriverByName('GTiff')
+
+        out_raster = driver.Create(out_file_name, cols, rows, bands, GDT_UInt16,
+                                   options=['INTERLEAVE=BAND', 'COMPRESS=DEFLATE', f'PHOTOMETRIC={photometric}'])
+        try:
+            if out_raster is None:
+                raise IOError("could not load gdal GeoTiff driver")
+
+            if sort_by_wavelength:
+                eo_list = list(np.argsort(np.array(self.center_wavelengths())[self.eo_indices()]))
+            else:
+                eo_list = self.eo_indices()
+
+            for out_band, in_band in enumerate(eo_list):
+                out_band = out_raster.GetRasterBand(out_band + 1)
+                out_data = self.__aligned_capture[:, :, in_band]
+                out_data[out_data < 0] = 0
+                out_data[out_data > 2] = 2  # limit reflectance data to 200% to allow some specular reflections
+                out_band.WriteArray(out_data * 32768)  # scale reflectance images so 100% = 32768
+                out_band.SetScale(32768)
+                out_band.SetOffset(0)
+                out_band.FlushCache()
+                out_band.ComputeStatistics(False)
+            
+            if lwir:
+                for out_band, in_band in enumerate(self.lw_indices()):
+                    out_band = out_raster.GetRasterBand(len(eo_list) + out_band + 1)
+                    # scale data from float degC to back to centi-Kelvin to fit into uint16
+                    out_data = (self.__aligned_capture[:, :, in_band] + 273.15) * 100
+                    out_data[out_data < 0] = 0
+                    out_data[out_data > 65535] = 65535
+                    out_band.WriteArray(out_data)
+                    out_band.SetScale(100)
+                    out_band.SetOffset(0)
+                    out_band.FlushCache()
+                    out_band.ComputeStatistics(False)
+        finally:
+            out_raster.BuildOverviews('average', [2, 4, 8, 16, 32, 64])
+            out_raster = None
+
+    # TODO added by ILAN
+    # same as alt but does not scale values for UInt16 output
+    def save_capture_as_stack_float(self, out_file_name, sort_by_wavelength=True, photometric='MINISBLACK', lwir=True):
+        """
+        Output the Images in the Capture object as GTiff image stack.
+        :param out_file_name: str system file path
+        :param sort_by_wavelength: boolean
+        :param photometric: str GDAL argument for GTiff color matching
+        """
+        from osgeo.gdal import GetDriverByName, GDT_Float64
+        if self.__aligned_capture is None:
+            raise RuntimeError("Call Capture.create_aligned_capture() prior to saving as stack.")
+
+        rows, cols, bands = self.__aligned_capture.shape
+        driver = GetDriverByName('GTiff')
+
+        out_raster = driver.Create(out_file_name, cols, rows, bands, GDT_Float64,
+                                   options=['INTERLEAVE=BAND', 'COMPRESS=DEFLATE', f'PHOTOMETRIC={photometric}'])
+        try:
+            if out_raster is None:
+                raise IOError("could not load gdal GeoTiff driver")
+
+            if sort_by_wavelength:
+                eo_list = list(np.argsort(np.array(self.center_wavelengths())[self.eo_indices()]))
+            else:
+                eo_list = self.eo_indices()
+
+            for out_band, in_band in enumerate(eo_list):
+                out_band = out_raster.GetRasterBand(out_band + 1)
+                out_data = self.__aligned_capture[:, :, in_band]
+                out_data[out_data < 0] = 0
+                out_data[out_data > 2] = 2  # limit reflectance data to 200% to allow some specular reflections
+                out_band.WriteArray(out_data)  # scale reflectance images so 100% = 32768
+                out_band.FlushCache()
+                out_band.ComputeStatistics(False)
+            
+            if lwir:
+                for out_band, in_band in enumerate(self.lw_indices()):
+                    out_band = out_raster.GetRasterBand(len(eo_list) + out_band + 1)
+                    # scale data from float degC to back to centi-Kelvin to fit into uint16
+                    out_data = (self.__aligned_capture[:, :, in_band] + 273.15)
+                    #out_data[out_data < 0] = 0
+                    #out_data[out_data > 65535] = 65535
+                    out_band.WriteArray(out_data)
+                    out_band.FlushCache()
+                    out_band.ComputeStatistics(False)
+        finally:
+            out_raster.BuildOverviews('average', [2, 4, 8, 16, 32, 64])
+            out_raster = None
+
+
+    # TODO added by ILAN
+    # same as alt but does not scale values for UInt16 output
+    def save_bands_as_refl_float(self, out_file_base, sort_by_wavelength=True, photometric='MINISBLACK', lwir=True):
+        """
+        Output the Images in the Capture object as GTiff image stack.
+        :param out_file_name: str system file path
+        :param sort_by_wavelength: boolean
+        :param photometric: str GDAL argument for GTiff color matching
+        """
+        from osgeo.gdal import GetDriverByName, GDT_Float64
+        
+        self.refl_imgs = self.undistorted_reflectance(self.dls_irradiance_raw())
+
+
+        cols, rows = self.images[0].size()
+        if lwir:
+            cols_lw, rows_lw = self.images[self.lw_indices()[0]].size()
+            bands = self.eo_indices() + self.lw_indices()
+        else:
+            bands = self.eo_indices()
+        
+        driver = GetDriverByName('GTiff')
+
+        if sort_by_wavelength:
+            eo_list = list(np.argsort(np.array(self.center_wavelengths())[self.eo_indices()]))
+        else:
+            eo_list = self.eo_indices()
+
+        for out_band, in_band in enumerate(eo_list):
+            out_name = f"{out_file_base}_{out_band + 1}.tif"
+            out_raster = driver.Create(out_name, cols, rows, 1, GDT_Float64,
+                                       options=['INTERLEAVE=BAND', 'COMPRESS=DEFLATE', f'PHOTOMETRIC={photometric}'])
+            if out_raster is None:
+                raise IOError("could not load gdal GeoTiff driver")
+            out_band = out_raster.GetRasterBand(1)
+            out_data = self.refl_imgs[in_band]
+            out_data[out_data < 0] = 0
+            out_data[out_data > 2] = 2  # limit reflectance data to 200% to allow some specular reflections
+            out_band.WriteArray(out_data)  # scale reflectance images so 100% = 32768
+            out_band.FlushCache()
+            out_band.ComputeStatistics(False)
+            out_raster.BuildOverviews('average', [2, 4, 8, 16, 32, 64])
+            out_raster = None
+        
+        if lwir:
+            for out_band, in_band in enumerate(self.lw_indices()):
+                out_name = f"{out_file_base}_{in_band + 1}.tif"
+                out_raster = driver.Create(out_name, cols_lw, rows_lw, 1, GDT_Float64,
+                                           options=['INTERLEAVE=BAND', 'COMPRESS=DEFLATE', f'PHOTOMETRIC={photometric}'])
+                out_band = out_raster.GetRasterBand(1)
+                # float degC
+                out_data = (self.refl_imgs[in_band])
+                #out_data[out_data < 0] = 0
+                #out_data[out_data > 65535] = 65535
+                out_band.WriteArray(out_data)
+                out_band.FlushCache()
+                out_band.ComputeStatistics(False)
+
 
     def save_capture_as_rgb(self, out_file_name, gamma=1.4, downsample=1, white_balance='norm', hist_min_percent=0.5,
                             hist_max_percent=99.5, sharpen=True, rgb_band_indices=(2, 1, 0)):
