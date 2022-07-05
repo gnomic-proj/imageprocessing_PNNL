@@ -23,6 +23,6 @@ dependencies:
       - pysolar
       - pyzbar
       - mapboxgl
-      - git+https://github.com/sylikc/pyexiftool#egg=pyexiftool
+      - pip install git+https://github.com/smarnach/pyexiftool.git#egg=pyexiftool
       - jenkspy
       - rawpy
