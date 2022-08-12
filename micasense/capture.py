@@ -333,14 +333,15 @@ class Capture(object):
         lw_imgs = [img.reflectance() for i, img in enumerate(self.lw_images())]
         return eo_imgs + lw_imgs
 
-    def undistorted_reflectance(self, irradiance_list):
+    # TODO Ilan added vignette_correct option; determines whether to include vignette correction or not
+    def undistorted_reflectance(self, irradiance_list, vignette_correct=True):
         """
         Compute undistorted reflectance Images.
         :param irradiance_list: List returned from Capture.dls_irradiance() or Capture.panel_irradiance()   TODO: improve this docstring
         :return: List of undistorted reflectance images for given irradiance.
         """
-        eo_imgs = [img.undistorted(img.reflectance(irradiance_list[i])) for i, img in enumerate(self.eo_images())]
-        lw_imgs = [img.undistorted(img.reflectance()) for i, img in enumerate(self.lw_images())]
+        eo_imgs = [img.undistorted(img.reflectance(irradiance_list[i], vignette_correct=vignette_correct)) for i, img in enumerate(self.eo_images())]
+        lw_imgs = [img.undistorted(img.reflectance(vignette_correct=False)) for i, img in enumerate(self.lw_images())]
         return eo_imgs + lw_imgs
 
     def panels_in_all_expected_images(self):
@@ -695,7 +696,7 @@ class Capture(object):
 
     # TODO added by ILAN
     # same as alt but does not scale values for UInt16 output
-    def save_bands_as_refl_float(self, out_file_base, sort_by_wavelength=True, photometric='MINISBLACK', lwir=True):
+    def save_bands_as_refl_float(self, out_file_base, sort_by_wavelength=True, photometric='MINISBLACK', lwir=True, vignette_correct=True):
         """
         Output the Images in the Capture object as GTiff image stack.
         :param out_file_name: str system file path
@@ -704,7 +705,10 @@ class Capture(object):
         """
         from osgeo.gdal import GetDriverByName, GDT_Float64
         
-        self.refl_imgs = self.undistorted_reflectance(self.dls_irradiance_raw())
+        # get the irradiance
+        # .dls_irradiance_raw() gives spectral irradiance
+        # TODO change to .dls_irradiance() to use horizontal irradiance 
+        self.refl_imgs = self.undistorted_reflectance(self.dls_irradiance_raw(), vignette_correct=vignette_correct)
 
 
         cols, rows = self.images[0].size()

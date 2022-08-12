@@ -249,7 +249,8 @@ class Image(object):
         width, height = self.meta.image_size()
         return width, height
 
-    def reflectance(self, irradiance=None, force_recompute=False):
+    # TODO Ilan added vignette_correct option; determines whether to include vignette correction or not
+    def reflectance(self, irradiance=None, force_recompute=False, vignette_correct=True):
         ''' Lazy-compute and return a reflectance image provided an irradiance reference '''
         if self.__reflectance_image is not None \
             and force_recompute == False \
@@ -262,9 +263,9 @@ class Image(object):
                 raise RuntimeError("Provide a band-specific spectral irradiance to compute reflectance")
         if self.band_name != 'LWIR':
             self.__reflectance_irradiance = irradiance
-            self.__reflectance_image = self.radiance() * math.pi / irradiance
+            self.__reflectance_image = self.radiance(vignette_correct=vignette_correct) * math.pi / irradiance
         else:
-            self.__reflectance_image = self.radiance()
+            self.__reflectance_image = self.radiance(vignette_correct=False)
         return self.__reflectance_image
 
     #TODO Ilan version using spectral instead of horizontal irradiance
@@ -312,7 +313,7 @@ class Image(object):
         self.__intensity_image = intensity_image.T
         return self.__intensity_image
 
-    def radiance(self, force_recompute=False):
+    def radiance(self, force_recompute=False, vignette_correct=True):
         ''' Lazy=computes and returns the radiance image after all radiometric
         corrections have been applied '''
         if self.__radiance_image is not None and force_recompute == False:
@@ -327,7 +328,12 @@ class Image(object):
             # apply image correction methods to raw image
             V, x, y = self.vignette()
             R = 1.0 / (1.0 + a2 * y / self.exposure_time - a3 * y)
-            L = V * R * (image_raw - self.black_level)
+            # correction with vignetting
+            if vignette_correct:
+                L = V * R * (image_raw - self.black_level)
+            # correction without
+            else:
+                L = R * (image_raw - self.black_level)
             L[L < 0] = 0
             max_raw_dn = float(2**self.bits_per_pixel)
             radiance_image = L.astype(float)/(self.gain * self.exposure_time)*a1/max_raw_dn
