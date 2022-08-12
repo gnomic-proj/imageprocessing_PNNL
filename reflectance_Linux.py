@@ -16,7 +16,6 @@ import pandas as pd
 import numpy as np
 import time
 import cv2
-os.chdir(r"C:\Users\gonz509\GitRepos\imageprocessing")
 # must be in proper directory before importing
 import micasense.metadata as metadata
 import micasense.capture as capture
@@ -176,7 +175,7 @@ def reflectance(im_groups, savepath=None, bbox=None, altmin=None, lwir=False, so
 #%% User set values
 
 # wd
-image_dir = r"\\pnl\Projects\UAV_Imagery\aafcam\20211115\002"
+image_dir = "/home/gonz509/mnt/ARM_UAS/aafcam/20211113a/0000SET/008"
 #image_path = os.path.join(image_dir,'IMG_1000_1.tif')  # single image
 
 
@@ -188,13 +187,19 @@ paths = glob.glob(glob_path)
 paths.sort()
 im_groups = [list(i) for j, i in groupby(paths, lambda a: a[:-6])]
 
-savepath = r"\\PNL\Projects\UAV_Imagery\Ilan\reflectance\20211115\unstacked\test_set2"
+savepath = "/home/gonz509/Projects/ARM_UAS/Nov/20211113/008"
+#savepath = "/home/gonz509/mnt/ARM_UAS/Ilan/reflectance/20211115/unstacked/000"
 # ULX, ULY, LRX, LRY, altitude minimum
 #bbox = -97.497701, 36.637810, -97.477929, 36.585851, 500
-altmin = 100
 bbox = None
+altmin = 100
 lwir = True  # set to true to include in output stack
 vignette_correct = False
+
 #%% Call
 
+tic = time.perf_counter()
 reflectance(im_groups, savepath=savepath, bbox=bbox, lwir=lwir)
+toc = time.pref_counter()
+
+print(f"Execution time: {toc - tic} seconds ({(toc - tic)/60} minutes)")

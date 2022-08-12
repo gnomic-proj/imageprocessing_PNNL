@@ -258,7 +258,7 @@ class ImageSet(object):
         :return: List data from all Captures, List column headers.
         """
         columns = [
-            'timestamp',
+            'timestamp', 'paths',
             'latitude', 'longitude', 'altitude',
             'capture_id',
             'dls-yaw', 'dls-pitch', 'dls-roll'
@@ -268,11 +268,14 @@ class ImageSet(object):
         data = []
         for cap in self.captures:
             dat = cap.utc_time()
+            paths = [tile.path for tile in cap.images]
             loc = list(cap.location())
             uuid = cap.uuid
             dls_pose = list(cap.dls_pose())
-            irr = cap.dls_irradiance()
-            row = [dat] + loc + [uuid] + dls_pose + irr
+            #irr = cap.dls_irradiance()
+            #TODO Ilan added this to give spectral instead of horizontal. Comment out and uncomment above to switch back to horizontal.
+            irr = cap.dls_irradiance_raw()
+            row = [dat] + [paths] + loc + [uuid] + dls_pose + irr
             data.append(row)
         return data, columns
 
