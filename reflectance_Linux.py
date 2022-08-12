@@ -199,7 +199,7 @@ vignette_correct = False
 #%% Call
 
 tic = time.perf_counter()
-reflectance(im_groups, savepath=savepath, bbox=bbox, lwir=lwir)
+reflectance(im_groups, savepath=savepath, bbox=bbox, altmin=altmin, lwir=lwir, vignette_correct=vignette_correct)
 toc = time.pref_counter()
 
 print(f"Execution time: {toc - tic} seconds ({(toc - tic)/60} minutes)")

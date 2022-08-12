@@ -197,4 +197,4 @@ lwir = True  # set to true to include in output stack
 vignette_correct = False
 #%% Call
 
-reflectance(im_groups, savepath=savepath, bbox=bbox, lwir=lwir)
+reflectance(im_groups, savepath=savepath, bbox=bbox, altmin=altmin, lwir=lwir, vignette_correct=vignette_correct)
