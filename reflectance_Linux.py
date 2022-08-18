@@ -149,7 +149,7 @@ def reflectance(im_groups, savepath=None, bbox=None, altmin=None, lwir=False, so
         
         # copy the metadata of original file to new one
         # get exiftool path
-        exiftool_cmd = os.path.normpath(os.environ.get('exiftoolpath'))
+        exiftool_cmd = 'exiftool'
         # sort bands by wavelengths if specified
         if sort_by_wavelength:
             eo_list = list(np.argsort(np.array(cap.center_wavelengths())[cap.eo_indices()]))
@@ -167,7 +167,7 @@ def reflectance(im_groups, savepath=None, bbox=None, altmin=None, lwir=False, so
             # copies original metadata to new images
             cmd = f'{exiftool_cmd} -tagsFromFile {src_path} -all:all -xmp {dst_path}'
             print(cmd)
-            subprocess.check_call(cmd)
+            subprocess.check_call(cmd, shell=True)
         
     toc = time.perf_counter()
     print(f"Saving time: {(toc-tic)/60} minutes")
@@ -175,7 +175,7 @@ def reflectance(im_groups, savepath=None, bbox=None, altmin=None, lwir=False, so
 #%% User set values
 
 # wd
-image_dir = "/home/gonz509/mnt/ARM_UAS/aafcam/20211113a/0000SET/008"
+image_dir = "/home/gonz509/mnt/ARM_UAS/aafcam/20211115/005"
 #image_path = os.path.join(image_dir,'IMG_1000_1.tif')  # single image
 
 
@@ -187,7 +187,7 @@ paths = glob.glob(glob_path)
 paths.sort()
 im_groups = [list(i) for j, i in groupby(paths, lambda a: a[:-6])]
 
-savepath = "/home/gonz509/Projects/ARM_UAS/Nov/20211113/008"
+savepath = "/home/gonz509/Projects/ARM_UAS/Nov/20211115_redo/005"
 #savepath = "/home/gonz509/mnt/ARM_UAS/Ilan/reflectance/20211115/unstacked/000"
 # ULX, ULY, LRX, LRY, altitude minimum
 #bbox = -97.497701, 36.637810, -97.477929, 36.585851, 500
