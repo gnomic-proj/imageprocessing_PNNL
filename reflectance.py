@@ -5,41 +5,130 @@ Created on Fri Jun 17 10:09:24 2022
 @author: gonz509
 """
 
-#import matplotlib.pyplot as plt
-#import numpy as np
-#import math
-#from functools import reduce
-#from itertools import groupby
-#from osgeo import gdal
 import os, glob
 import pandas as pd
 import numpy as np
 import time
-import cv2
+#import cv2
 os.chdir(r"C:\Users\gonz509\GitRepos\imageprocessing")
 # must be in proper directory before importing
 import micasense.metadata as metadata
-import micasense.capture as capture
-import micasense.imageutils as imageutils
+#import micasense.capture as capture
+#import micasense.imageutils as imageutils
 import micasense.imageset as imageset
-from ipywidgets import FloatProgress, Layout
-from IPython.display import display
-import exiftool
+#import exiftool
 from mapboxgl.utils import df_to_geojson
 import subprocess
 from itertools import groupby
+import argparse
 
 
-def decdeg2dms(dd):
-   is_positive = dd >= 0
-   dd = abs(dd)
-   minutes,seconds = divmod(dd*3600,60)
-   degrees,minutes = divmod(minutes,60)
-   degrees = degrees if is_positive else -degrees
-   return (degrees,minutes,seconds)
+#%% Input parameters
 
 
-def reflectance(im_groups, savepath=None, bbox=None, altmin=None, lwir=False, sort_by_wavelength=True, vignette_correct=True):
+###########################################
+###  I N P U T     P A R A M E T E R S  ###
+###########################################
+
+
+parser = argparse.ArgumentParser()
+# required args
+parser.add_argument('image_directory', help="directory containing tiles")
+parser.add_argument('output_directory', help="output directory")
+
+# optional args
+parser.add_argument('--bbox', default=0, nargs="+", type=float, help="bounding box with coordinates given as: ULX ULY LRX LRY")
+parser.add_argument('--altmin', default=100, type=int, help="Minmal altitude for image to be considered (in metadata units)")
+parser.add_argument('--no_lwir', action='store_false', help="do not include long wave IR (thermal) band in output")
+parser.add_argument('--no_sbw', action='store_false', help="do not sort bands by wavelength")
+parser.add_argument('--no_vc', action='store_false', help="do not perform vignetting correction")
+# although the arguments with the 'no' prefix indicate NOT to do something,
+# a True value means it WILL do it and a false value means it WILL NOT.
+# the default values are True, meaning if you don't add the flag it WILL
+# perform those things
+parser.set_defaults(no_lwir=True)
+parser.set_defaults(no_sbw=True)
+parser.set_defaults(no_vc=True)
+args = parser.parse_args()
+
+# set variables from parser
+image_dir = args.image_directory
+savepath = args.output_directory
+altmin = args.altmin  # the minimum altitude for images to be included in processing
+# a bounding box with the coordinates ordered as: ULX, ULY, LRX, LRY
+bbox = args.bbox
+lwir = args.no_lwir  # whether or not to include thermal band in processing
+sbw = args.no_sbw  # whether or not to include thermal band in processing
+vignette_correct = args.no_vc  # whether to apply vignetting correction
+
+
+#################################################################
+#%% Within script defined input parameters
+# output folder
+savepath = r"\\PNL\Projects\UAV_Imagery\Ilan\reflectance\20211115\unstacked\test_set2"
+altmin = 100  # the minimum altitude for images to be included in processing
+# a bounding box with the coordinates ordered as: ULX, ULY, LRX, LRY
+bbox = None
+lwir = True  # whether or not to include thermal band in processing
+vignette_correct = False  # whether to apply vignetting correction
+image_dir = r"\\pnl\Projects\UAV_Imagery\aafcam\20211115\002"
+
+
+#%% Functions
+
+
+def create_nested_list_of_images(image_dir, glob_pattern="*.tif"):
+    # TODO this needs to be a user defined param outside directory
+    #image_path = os.path.join(image_dir,'IMG_1000_1.tif')  # single image
+    
+    
+    glob_pattern = "*.tif"
+    glob_path = os.path.join(image_dir, glob_pattern)
+    paths = glob.glob(glob_path)
+    #paths = [path for path in paths if not path.endswith("6.tif")]
+    
+    paths.sort()
+    im_groups = [list(i) for j, i in groupby(paths, lambda a: a[:-6])]
+    
+    return im_groups
+
+
+def reflectance(im_groups, savepath, bbox=None, altmin=None, lwir=True,
+                sort_by_wavelength=True, vignette_correct=True):
+    """
+    
+
+    Parameters
+    ----------
+    im_groups : list
+        Nested list of full paths of tiles pertaining to each capture.
+    savepath : str
+        Path of the output folder.
+    bbox : sequence, optional
+        Bounding box tuple with the coordinates ordered as: ULX, ULY, LRX, LRY.
+        The default is None.
+    altmin : int, optional
+        Minimum altitude in metadata units for image to be considered.
+        The default is None (i.e. no minimum).
+    lwir : bool, optional
+        Whether to include long wave IR (thermal) in output.
+        The default is True.
+    sort_by_wavelength : bool, optional
+        Whether to sort the bands in order of thier wavelengths.
+        The default is True.
+    vignette_correct : bool, optional
+        Whether to perform the vigentting correction. The default is True.
+
+    Raises
+    ------
+    Exception
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
     
     #TODO include altitude grouping here, need to think through how to add
     # TODO also need to make this work for when there is no bbox, doesn't seem like it does currently?
@@ -172,29 +261,42 @@ def reflectance(im_groups, savepath=None, bbox=None, altmin=None, lwir=False, so
         
     toc = time.perf_counter()
     print(f"Saving time: {(toc-tic)/60} minutes")
+
+#%% Main
+
+def main():
     
+    im_groups = create_nested_list_of_images(image_dir)
+    
+    reflectance(im_groups, savepath=savepath, bbox=bbox, altmin=altmin,
+                lwir=lwir, vignette_correct=vignette_correct)
+    
+if __name__ == '__main__':
+    main()    
 #%% User set values
 
-# wd
-image_dir = r"\\pnl\Projects\UAV_Imagery\aafcam\20211115\002"
-#image_path = os.path.join(image_dir,'IMG_1000_1.tif')  # single image
+
+# # wd
+# image_dir = r"\\pnl\Projects\UAV_Imagery\aafcam\20211115\002"
+# #image_path = os.path.join(image_dir,'IMG_1000_1.tif')  # single image
 
 
-glob_pattern = "*.tif"
-glob_path = os.path.join(image_dir, glob_pattern)
-paths = glob.glob(glob_path)
-#paths = [path for path in paths if not path.endswith("6.tif")]
+# glob_pattern = "*.tif"
+# glob_path = os.path.join(image_dir, glob_pattern)
+# paths = glob.glob(glob_path)
+# #paths = [path for path in paths if not path.endswith("6.tif")]
 
-paths.sort()
-im_groups = [list(i) for j, i in groupby(paths, lambda a: a[:-6])]
+# paths.sort()
+# im_groups = [list(i) for j, i in groupby(paths, lambda a: a[:-6])]
 
-savepath = r"\\PNL\Projects\UAV_Imagery\Ilan\reflectance\20211115\unstacked\test_set2"
-# ULX, ULY, LRX, LRY, altitude minimum
-#bbox = -97.497701, 36.637810, -97.477929, 36.585851, 500
-altmin = 100
-bbox = None
-lwir = True  # set to true to include in output stack
-vignette_correct = False
+
+# savepath = r"\\PNL\Projects\UAV_Imagery\Ilan\reflectance\20211115\unstacked\test_set2"
+# # ULX, ULY, LRX, LRY, altitude minimum
+# #bbox = -97.497701, 36.637810, -97.477929, 36.585851, 500
+# altmin = 100
+# bbox = None
+# lwir = True  # set to true to include in output stack
+# vignette_correct = False
 #%% Call
 
-reflectance(im_groups, savepath=savepath, bbox=bbox, altmin=altmin, lwir=lwir, vignette_correct=vignette_correct)
+#reflectance(im_groups, savepath=savepath, bbox=bbox, altmin=altmin, lwir=lwir, vignette_correct=vignette_correct)

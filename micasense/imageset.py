@@ -251,6 +251,7 @@ class ImageSet(object):
             progress_callback(1.0)
         return cls(captures)
 
+    # TODO Ilan added paths field
     def as_nested_lists(self):
         """
         Get timestamp, latitude, longitude, altitude, capture_id, dls-yaw, dls-pitch, dls-roll, and irradiance from all
@@ -269,7 +270,14 @@ class ImageSet(object):
         for cap in self.captures:
             dat = cap.utc_time()
             loc = list(cap.location())
-            paths = [tile.path for tile in cap.images]
+            ##
+            npath = os.path.normpath(tile.path)  # get normalized path
+            dpath_parent = os.path.dirname(npath).split(os.sep)[-1]  # get parent directory (i.e. chunk 3-digit number)
+            bpath = os.path.basename(npath).split(".")[-2]  # get name of file without extension
+            bpath_noband = ('_').join(bpath.split('_')[:-1])
+            bnd = bpath.split('_')[-1]
+            paths = [f"{dpath_parent}_{bpath_noband}_refl_{bnd}.tif" for tile in cap.images]
+            ##
             uuid = cap.uuid
             dls_pose = list(cap.dls_pose())
             #irr = cap.dls_irradiance()

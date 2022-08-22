@@ -747,8 +747,8 @@ class Capture(object):
                 out_raster = driver.Create(out_name, cols_lw, rows_lw, 1, GDT_Float64,
                                            options=['INTERLEAVE=BAND', 'COMPRESS=DEFLATE', f'PHOTOMETRIC={photometric}'])
                 out_band = out_raster.GetRasterBand(1)
-                # float degC
-                out_data = (self.refl_imgs[in_band])
+                #  convert float degC back to float K
+                out_data = (self.refl_imgs[in_band] + 273.15)
                 #out_data[out_data < 0] = 0
                 #out_data[out_data > 65535] = 65535
                 out_band.WriteArray(out_data)
