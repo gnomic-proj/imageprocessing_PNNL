@@ -10,7 +10,6 @@ import pandas as pd
 import numpy as np
 import time
 #import cv2
-os.chdir(r"C:\Users\gonz509\GitRepos\imageprocessing")
 # must be in proper directory before importing
 import micasense.metadata as metadata
 #import micasense.capture as capture
@@ -239,7 +238,7 @@ def reflectance(im_groups, savepath, bbox=None, altmin=None, lwir=True,
         
         # copy the metadata of original file to new one
         # get exiftool path
-        exiftool_cmd = os.path.normpath(os.environ.get('exiftoolpath'))
+        exiftool_cmd = 'exiftool'
         # sort bands by wavelengths if specified
         if sort_by_wavelength:
             eo_list = list(np.argsort(np.array(cap.center_wavelengths())[cap.eo_indices()]))
@@ -264,27 +263,27 @@ def reflectance(im_groups, savepath, bbox=None, altmin=None, lwir=True,
     
 #%% User set values
 
-# wd
-image_dir = "/home/gonz509/mnt/ARM_UAS/aafcam/20211115/005"
-#image_path = os.path.join(image_dir,'IMG_1000_1.tif')  # single image
+# # wd
+# image_dir = "/home/gonz509/mnt/ARM_UAS/aafcam/20211115/005"
+# #image_path = os.path.join(image_dir,'IMG_1000_1.tif')  # single image
 
 
-glob_pattern = "*.tif"
-glob_path = os.path.join(image_dir, glob_pattern)
-paths = glob.glob(glob_path)
-#paths = [path for path in paths if not path.endswith("6.tif")]
+# glob_pattern = "*.tif"
+# glob_path = os.path.join(image_dir, glob_pattern)
+# paths = glob.glob(glob_path)
+# #paths = [path for path in paths if not path.endswith("6.tif")]
 
-paths.sort()
-im_groups = [list(i) for j, i in groupby(paths, lambda a: a[:-6])]
+# paths.sort()
+# im_groups = [list(i) for j, i in groupby(paths, lambda a: a[:-6])]
 
-savepath = "/home/gonz509/Projects/ARM_UAS/Nov/20211115_redo/005"
-#savepath = "/home/gonz509/mnt/ARM_UAS/Ilan/reflectance/20211115/unstacked/000"
-# ULX, ULY, LRX, LRY, altitude minimum
-#bbox = -97.497701, 36.637810, -97.477929, 36.585851, 500
-bbox = None
-altmin = 100
-lwir = True  # set to true to include in output stack
-vignette_correct = False
+# savepath = "/home/gonz509/Projects/ARM_UAS/Nov/20211115_redo/005"
+# #savepath = "/home/gonz509/mnt/ARM_UAS/Ilan/reflectance/20211115/unstacked/000"
+# # ULX, ULY, LRX, LRY, altitude minimum
+# #bbox = -97.497701, 36.637810, -97.477929, 36.585851, 500
+# bbox = None
+# altmin = 100
+# lwir = True  # set to true to include in output stack
+# vignette_correct = False
 
 
 #%% Main

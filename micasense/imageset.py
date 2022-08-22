@@ -271,12 +271,16 @@ class ImageSet(object):
             dat = cap.utc_time()
             loc = list(cap.location())
             ##
-            npath = os.path.normpath(tile.path)  # get normalized path
-            dpath_parent = os.path.dirname(npath).split(os.sep)[-1]  # get parent directory (i.e. chunk 3-digit number)
-            bpath = os.path.basename(npath).split(".")[-2]  # get name of file without extension
-            bpath_noband = ('_').join(bpath.split('_')[:-1])
-            bnd = bpath.split('_')[-1]
-            paths = [f"{dpath_parent}_{bpath_noband}_refl_{bnd}.tif" for tile in cap.images]
+            paths = []
+            for tile in cap.images:
+                npath = os.path.normpath(tile.path)  # get normalized path
+                dpath_parent = os.path.dirname(npath).split(os.sep)[-1]  # get parent directory (i.e. chunk 3-digit number)
+                bpath = os.path.basename(npath).split(".")[-2]  # get name of file without extension
+                bpath_noband = ('_').join(bpath.split('_')[:-1])
+                bnd = bpath.split('_')[-1]
+                pth = f"{dpath_parent}_{bpath_noband}_refl_{bnd}.tif"
+                paths.append(pth)
+                #paths = [f"{dpath_parent}_{bpath_noband}_refl_{bnd}.tif" for tile in cap.images]
             ##
             uuid = cap.uuid
             dls_pose = list(cap.dls_pose())

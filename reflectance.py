@@ -10,7 +10,6 @@ import pandas as pd
 import numpy as np
 import time
 #import cv2
-os.chdir(r"C:\Users\gonz509\GitRepos\imageprocessing")
 # must be in proper directory before importing
 import micasense.metadata as metadata
 #import micasense.capture as capture
@@ -65,13 +64,13 @@ vignette_correct = args.no_vc  # whether to apply vignetting correction
 #################################################################
 #%% Within script defined input parameters
 # output folder
-savepath = r"\\PNL\Projects\UAV_Imagery\Ilan\reflectance\20211115\unstacked\test_set2"
-altmin = 100  # the minimum altitude for images to be included in processing
-# a bounding box with the coordinates ordered as: ULX, ULY, LRX, LRY
-bbox = None
-lwir = True  # whether or not to include thermal band in processing
-vignette_correct = False  # whether to apply vignetting correction
-image_dir = r"\\pnl\Projects\UAV_Imagery\aafcam\20211115\002"
+# savepath = r"\\PNL\Projects\UAV_Imagery\Ilan\reflectance\20211115\unstacked\test_set2"
+# altmin = 100  # the minimum altitude for images to be included in processing
+# # a bounding box with the coordinates ordered as: ULX, ULY, LRX, LRY
+# bbox = None
+# lwir = True  # whether or not to include thermal band in processing
+# vignette_correct = False  # whether to apply vignetting correction
+# image_dir = r"\\pnl\Projects\UAV_Imagery\aafcam\20211115\002"
 
 
 #%% Functions
@@ -201,9 +200,10 @@ def reflectance(im_groups, savepath, bbox=None, altmin=None, lwir=True,
     df = pd.DataFrame.from_records(data, index='timestamp', columns=columns)
     geojson_data = df_to_geojson(df,columns[3:],lat='latitude',lon='longitude')
     group_str = os.path.dirname(im_groups[0][0])[-3:]
-    geojson_name = group_str + "_imageSet.geojson"
-    csv_name = group_str + "_imageSet.csv"
-    df.to_csv(csv_name, index=False)
+    geojson_name = f"{group_str}_imageSet.geojson"
+    csv_name = f"{group_str}_imageSet.csv"
+    csv_out = os.join(savepath, csv_name)
+    df.to_csv(csv_out, index=False)
     with open(os.path.join(savepath,geojson_name),'w') as f:
         f.write(str(geojson_data))
     
@@ -239,7 +239,10 @@ def reflectance(im_groups, savepath, bbox=None, altmin=None, lwir=True,
         
         # copy the metadata of original file to new one
         # get exiftool path
-        exiftool_cmd = os.path.normpath(os.environ.get('exiftoolpath'))
+        if os.name == 'nt':
+            exiftool_cmd = os.path.normpath(os.environ.get('exiftoolpath'))
+        else:
+            exiftool_cmd = 'exiftool'
         # sort bands by wavelengths if specified
         if sort_by_wavelength:
             eo_list = list(np.argsort(np.array(cap.center_wavelengths())[cap.eo_indices()]))
@@ -257,8 +260,18 @@ def reflectance(im_groups, savepath, bbox=None, altmin=None, lwir=True,
             # copies original metadata to new images
             cmd = f'{exiftool_cmd} -tagsFromFile {src_path} -all:all -xmp {dst_path}'
             print(cmd)
-            subprocess.check_call(cmd)
-        
+            if os.name == 'nt':
+                subprocess.check_call(cmd)
+            else:
+                subprocess.check_call(cmd, shell=True)
+            
+            # remove duplicate orignal exiftool creates
+            os.remove(f"{dst_path}_original")
+    
+    # remove unnecessary duplicates of original that exiftool creates
+    # folder = os.path.dirname(dst_path)
+    # rm_glob = os.path.join(folder, "*.tif_original")
+    # os.remove(rm_glob)    
     toc = time.perf_counter()
     print(f"Saving time: {(toc-tic)/60} minutes")
 
