@@ -198,7 +198,7 @@ def reflectance(im_groups, out_dir, bbox=None, altmin=None, lwir=True,
     group_str = os.path.dirname(im_groups[0][0])[-3:]
     geojson_name = f"{group_str}_imageSet.geojson"
     csv_name = f"{group_str}_imageSet.csv"
-    csv_out = os.join(out_dir, csv_name)
+    csv_out = os.path.join(out_dir, csv_name)
     df.to_csv(csv_out, index=False)
     with open(os.path.join(out_dir,geojson_name),'w') as f:
         f.write(str(geojson_data))
@@ -265,7 +265,7 @@ def reflectance(im_groups, out_dir, bbox=None, altmin=None, lwir=True,
             os.remove(f"{dst_path}_original")
  
     toc = time.perf_counter()
-    print(f"Saving time: {(toc-tic)/60} minutes")
+    print(f"Finished making reflectance images. Execution time: {(toc-tic)/60} minutes")
     
     return csv_out
 
@@ -384,219 +384,225 @@ def altitude_filter(imageSet_csv_path):
     df_out.to_csv(df_out_name, index=False)
     
     
-    def agisoft_make_ortho(out_dir):
+def agisoft_make_ortho(out_dir):
+
+    norm_path_in = os.path.normpath(out_dir)
+    norm_path_out = os.path.join(norm_path_in, "orthos")
+    dir_names = norm_path_in.split(os.sep)
+    date = dir_names[-2]
+    chunk_str = dir_names[-1]
+    out_base = os.path.join(norm_path_out, f"{date}_{chunk_str}")
     
-        norm_path_in = os.path.normpath(out_dir)
-        norm_path_out = os.path.join(norm_path_in, "orthos")
-        dir_names = norm_path_in.split(os.sep)
-        date = dir_names[-2]
-        chunk_str = dir_names[-1]
-        out_base = os.path.join(norm_path_out, f"{date}_{chunk_str}")
+    # make output folder
+    os.mkdir(norm_path_out)
+    
+    alt_csv = os.path.join(norm_path_in, f"{chunk_str}_imageSet_altitude_classes.csv")
+    df = pd.read_csv(alt_csv)
+    
+    # Make absolute path to images
+    make_abs_path = lambda x: os.path.join(norm_path_in, os.path.basename(x))
+    df["abs_path"] = df["paths"].apply(make_abs_path)
+    
+    
+    # get altitude classes
+    alt_classes = df.alt_class.unique()
+    
+    # extract list of files for each altitude class into dictionary
+    image_dict = {alt: df.abs_path[df.alt_class == alt].tolist() for alt in alt_classes}
+    
+    
+    #project_name = 'project_005_redo.psx'
+    # photos = find_files(image_folder, [".tif", ".tiff"])
+    
+    image_compression = Metashape.ImageCompression()
+    image_compression.tiff_big = True
+    
+    dem_list = []
+    ortho_list = []
+    for alt, photos in image_dict.items():
         
-        # make output folder
-        os.mkdir(norm_path_out)
+        out_project = f"{out_base}_{alt}.psx"  # project output path
+    
+        # create document object
+        doc = Metashape.Document()
+        doc.save(out_project)
         
-        alt_csv = os.path.join(norm_path_in, f"{chunk_str}_imageSet_altitude_classes.csv")
-        df = pd.read_csv(alt_csv)
+        chunk = doc.addChunk()
         
-        # Make absolute path to images
-        make_abs_path = lambda x: os.path.join(norm_path_in, os.path.basename(x))
-        df["abs_path"] = df["paths"].apply(make_abs_path)
+        chunk.addPhotos(photos)
+        doc.save()
         
+        print(str(len(chunk.cameras)) + " images loaded")
         
-        # get altitude classes
-        alt_classes = df.alt_class.unique()
+        chunk.matchPhotos(keypoint_limit = 40000, tiepoint_limit = 20000, generic_preselection = True, reference_preselection = True)
+        #doc.save()
         
-        # extract list of files for each altitude class into dictionary
-        image_dict = {alt: df.abs_path[df.alt_class == alt].tolist() for alt in alt_classes}
+        chunk.alignCameras()
+        #doc.save()
+    
+        chunk.buildDepthMaps(downscale = 2, filter_mode = Metashape.AggressiveFiltering)
+        #doc.save()
+    
+        chunk.buildModel(source_data = Metashape.DepthMapsData)
+        #doc.save()
+    
+        chunk.buildUV(page_count = 2, texture_size = 4096)
+        #doc.save()
+    
+        chunk.buildTexture(texture_size = 4096, ghosting_filter = True)
+        #doc.save()
         
-        
-        #project_name = 'project_005_redo.psx'
-        # photos = find_files(image_folder, [".tif", ".tiff"])
-        
-        image_compression = Metashape.ImageCompression()
-        image_compression.tiff_big = True
-        
-        dem_list = []
-        ortho_list = []
-        for alt, photos in image_dict.items():
-            
-            out_project = f"{out_base}_{alt}.psx"  # project output path
-        
-            # create document object
-            doc = Metashape.Document()
-            doc.save(out_project)
-            
-            chunk = doc.addChunk()
-            
-            chunk.addPhotos(photos)
+        has_transform = chunk.transform.scale and chunk.transform.rotation and chunk.transform.translation
+    
+        if has_transform:
+            chunk.buildDenseCloud()
+            #doc.save()
+    
+            chunk.buildDem(source_data=Metashape.DenseCloudData)
+            #doc.save()
+    
+            chunk.buildOrthomosaic(surface_data=Metashape.ElevationData, fill_holes=False)
             doc.save()
+        else:
+            raise Exception("Transfrom is missing. Try reloading project.")
+        
+        if chunk.orthomosaic:
+            out_ortho = f"{out_base}_{alt}_ortho.tif"
+            chunk.exportRaster(out_ortho, source_data = Metashape.OrthomosaicData,
+                               save_alpha=False, image_compression=image_compression)
+            print(f"{out_ortho} successfully written to disk.")
+            ortho_list.append(out_ortho)
+        else:
+            raise Exception(f"Orthomosaic not present in chunk object for chunk {chunk_str}_{alt}. Try reloading project.")
             
-            print(str(len(chunk.cameras)) + " images loaded")
-            
-            chunk.matchPhotos(keypoint_limit = 40000, tiepoint_limit = 20000, generic_preselection = True, reference_preselection = True)
-            #doc.save()
-            
-            chunk.alignCameras()
-            #doc.save()
-        
-            chunk.buildDepthMaps(downscale = 2, filter_mode = Metashape.AggressiveFiltering)
-            #doc.save()
-        
-            chunk.buildModel(source_data = Metashape.DepthMapsData)
-            #doc.save()
-        
-            chunk.buildUV(page_count = 2, texture_size = 4096)
-            #doc.save()
-        
-            chunk.buildTexture(texture_size = 4096, ghosting_filter = True)
-            #doc.save()
-            
-            has_transform = chunk.transform.scale and chunk.transform.rotation and chunk.transform.translation
-        
-            if has_transform:
-                chunk.buildDenseCloud()
-                #doc.save()
-        
-                chunk.buildDem(source_data=Metashape.DenseCloudData)
-                #doc.save()
-        
-                chunk.buildOrthomosaic(surface_data=Metashape.ElevationData, fill_holes=False)
-                doc.save()
-            else:
-                raise Exception("Transfrom is missing. Try reloading project.")
-            
-            if chunk.orthomosaic:
-                out_ortho = f"{out_base}_{alt}_ortho.tif"
-                chunk.exportRaster(out_ortho, source_data = Metashape.OrthomosaicData,
-                                   save_alpha=False, image_compression=image_compression)
-                print(f"{out_ortho} successfully written to disk.")
-                ortho_list.append(out_ortho)
-            else:
-                raise Exception(f"Orthomosaic not present in chunk object for chunk {chunk_str}_{alt}. Try reloading project.")
-                
-            if chunk.elevation:
-                out_DEM = f"{out_base}_{alt}_DEM.tif"
-                chunk.exportRaster(out_DEM, source_data = Metashape.ElevationData,
-                                   save_alpha=False, title="DEM", image_compression=image_compression,
-                                   nodata_value = 65535)
-                print(f"{out_ortho} successfully written to disk.")
-                dem_list.append(out_DEM)
-            else:
-                raise Exception(f"Orthomosaic not present in chunk object for chunk {chunk_str}_{alt}. Try reloading project.")
+        if chunk.elevation:
+            out_DEM = f"{out_base}_{alt}_DEM.tif"
+            chunk.exportRaster(out_DEM, source_data = Metashape.ElevationData,
+                               save_alpha=False, title="DEM", image_compression=image_compression,
+                               nodata_value = 65535)
+            print(f"{out_ortho} successfully written to disk.")
+            dem_list.append(out_DEM)
+        else:
+            raise Exception(f"Orthomosaic not present in chunk object for chunk {chunk_str}_{alt}. Try reloading project.")
 
-        
-        
-        # run this to close project?
-        Metashape.Document()
-        
-        return norm_path_out, ortho_list, dem_list
-            
-        
-        def scale_tiff_ortho(tiff_path, out_dir_post_process):
-            
-            path_out = f"{tiff_path.split('.')[-2]}_scaled.tif"
-            ds = gdal.Open(tiff_path)
-            
-            dtype = gdal.GDT_UInt16
-            XSize = ds.GetRasterBand(1).XSize
-            YSize = ds.GetRasterBand(1).YSize
-            
-            driver = gdal.GetDriverByName('GTiff')
-            ds_out = driver.Create(path_out, XSize, YSize, 6, dtype, options=['BIGTIFF=YES'])
-            ds_out.SetProjection(ds.GetProjection())
-            ds_out.SetGeoTransform(ds.GetGeoTransform())
-            
-            
-            for i in range(1,7):
-                inband = ds.GetRasterBand(i)
-                outband = ds_out.GetRasterBand(i)
-                dta = inband.ReadAsArray()
-                dta_ma = ma.masked_values(dta, 1.)
-            
-                
-                if i <= 5:
-                    # set scale for optical bands to 1000 for compression
-                    outband.SetScale(.0001)
-                    outband.SetOffset(0)
-                    # change values that were 1.0 in original to no data value
-                    # apply gain and offset and scale
-                    dta_ma_scaled = dta_ma * 10000
-                    
-            
-                elif i == 6:
-                    # set scale for thermal to 100 for compression
-                    outband.SetScale(.01)
-                    outband.SetOffset(0)
-                    # change values that were 1.0 in original to no data value
-                    # apply scale (no empirical line fit)
-                    dta_ma_scaled = dta_ma * 100
-                    
-                    
-                dta_scaled = dta_ma_scaled.filled(fill_value=65535)
-                # write
-                outband.WriteArray(dta_scaled)
-                # set no data value
-                outband.SetNoDataValue(65535)
-                outband.FlushCache()
-                # compute statistics (Flase means it uses all values)
-                ds_out.GetRasterBand(i).ComputeStatistics(False)
-                
-            
-            # build overviews
-            ds_out.BuildOverviews('average', [2, 4, 8, 16, 32, 64])
-            
-            # required to release variable and finish writing
-            ds_out = None
-
-
-        def scale_tiff_DEM(tiff_path, out_dir_post_process):
-            
-            path_out = f"{tiff_path.split('.')[-2]}_scaled.tif"
-            ds = gdal.Open(tiff_path)
-            
-            dtype = gdal.GDT_UInt16
-            XSize = ds.GetRasterBand(1).XSize
-            YSize = ds.GetRasterBand(1).YSize
-            
-            driver = gdal.GetDriverByName('GTiff')
-            ds_out = driver.Create(path_out, XSize, YSize, 1, dtype)
-            ds_out.SetProjection(ds.GetProjection())
-            ds_out.SetGeoTransform(ds.GetGeoTransform())
-            
-            
-            inband = ds.GetRasterBand(i)
-            outband = ds_out.GetRasterBand(i)
-            dta = inband.ReadAsArray()
-            dta_ma = ma.masked_values(dta, 65535)
-                        
     
-            # set scale for DEM to 10 for compression
-            outband.SetScale(.1)
+    
+    # run this to close project?
+    Metashape.Document()
+    
+    return norm_path_out, ortho_list, dem_list
+        
+    
+def scale_tiff_ortho(tiff_path, out_dir_post_process):
+    
+    path_out_base = os.path.basename(f"{tiff_path.split('.')[-2]}_scaled.tif")
+    path_out = os.path.join(out_dir_post_process, path_out_base)
+    ds = gdal.Open(tiff_path)
+    
+    dtype = gdal.GDT_UInt16
+    XSize = ds.GetRasterBand(1).XSize
+    YSize = ds.GetRasterBand(1).YSize
+    
+    driver = gdal.GetDriverByName('GTiff')
+    ds_out = driver.Create(path_out, XSize, YSize, 6, dtype, options=['BIGTIFF=YES'])
+    ds_out.SetProjection(ds.GetProjection())
+    ds_out.SetGeoTransform(ds.GetGeoTransform())
+    
+    
+    for i in range(1,7):
+        inband = ds.GetRasterBand(i)
+        outband = ds_out.GetRasterBand(i)
+        dta = inband.ReadAsArray()
+        dta_ma = ma.masked_values(dta, 1.)
+    
+        
+        if i <= 5:
+            # set scale for optical bands to 1000 for compression
+            outband.SetScale(.0001)
             outband.SetOffset(0)
-            # specify unit of DEM
-            outband.SetUnitType('meter')
+            # change values that were 1.0 in original to no data value
+            # apply gain and offset and scale
+            dta_ma_scaled = dta_ma * 10000
+            
+    
+        elif i == 6:
+            # set scale for thermal to 100 for compression
+            outband.SetScale(.01)
+            outband.SetOffset(0)
             # change values that were 1.0 in original to no data value
             # apply scale (no empirical line fit)
-            dta_ma_scaled = dta_ma * 10
-                
-                
-            dta_scaled = dta_ma_scaled.filled(fill_value=65535)
-            # write
-            outband.WriteArray(dta_scaled)
-            # set no data value
-            outband.SetNoDataValue(65535)
-            outband.FlushCache()
-            # compute statistics (Flase means it uses all values)
-            ds_out.GetRasterBand(i).ComputeStatistics(False)
-                
+            dta_ma_scaled = dta_ma * 100
             
-            # build overviews
-            ds_out.BuildOverviews('average', [2, 4, 8, 16, 32, 64])
             
-            # required to release variable and finish writing
-            ds_out = None
+        dta_scaled = dta_ma_scaled.filled(fill_value=65535)
+        # write
+        outband.WriteArray(dta_scaled)
+        # set no data value
+        outband.SetNoDataValue(65535)
+        outband.FlushCache()
+        # compute statistics (Flase means it uses all values)
+        ds_out.GetRasterBand(i).ComputeStatistics(False)
+        
     
+    # build overviews
+    ds_out.BuildOverviews('average', [2, 4, 8, 16, 32, 64])
+    
+    # required to release variable and finish writing
+    ds_out = None
+    
+    # delete uncompressed ortho
+    #os.remove(tiff_path)
+
+def scale_tiff_DEM(tiff_path, out_dir_post_process):
+    
+    path_out_base = os.path.basename(f"{tiff_path.split('.')[-2]}_scaled.tif")
+    path_out = os.path.join(out_dir_post_process, path_out_base)
+    ds = gdal.Open(tiff_path)
+    
+    dtype = gdal.GDT_UInt16
+    XSize = ds.GetRasterBand(1).XSize
+    YSize = ds.GetRasterBand(1).YSize
+    
+    driver = gdal.GetDriverByName('GTiff')
+    ds_out = driver.Create(path_out, XSize, YSize, 1, dtype)
+    ds_out.SetProjection(ds.GetProjection())
+    ds_out.SetGeoTransform(ds.GetGeoTransform())
+    
+    
+    inband = ds.GetRasterBand(1)
+    outband = ds_out.GetRasterBand(1)
+    dta = inband.ReadAsArray()
+    dta_ma = ma.masked_values(dta, 65535)
+                
+
+    # set scale for DEM to 10 for compression
+    outband.SetScale(.1)
+    outband.SetOffset(0)
+    # specify unit of DEM
+    outband.SetUnitType('meter')
+    # change values that were 1.0 in original to no data value
+    # apply scale (no empirical line fit)
+    dta_ma_scaled = dta_ma * 10
+        
+        
+    dta_scaled = dta_ma_scaled.filled(fill_value=65535)
+    # write
+    outband.WriteArray(dta_scaled)
+    # set no data value
+    outband.SetNoDataValue(65535)
+    outband.FlushCache()
+    # compute statistics (Flase means it uses all values)
+    ds_out.GetRasterBand(1).ComputeStatistics(False)
+        
+    
+    # build overviews
+    ds_out.BuildOverviews('average', [2, 4, 8, 16, 32, 64])
+    
+    # required to release variable and finish writing
+    ds_out = None
+
+    # delete uncompressed DEM
+    #os.remove(tiff_path)
 
 #%% Main
 
@@ -614,8 +620,11 @@ def main():
     
     altitude_filter(imageSet_csv_path)
     
+    print("Beginning Agisoft orthomosaic production.")
     ortho_dir, ortho_list, dem_list = agisoft_make_ortho(out_dir)
+    print("Finished Agisoft orthomosaic production.")
 
+    print("Beginning post processing.")
     out_dir_post_process = os.path.join(ortho_dir, "post_processed")
     os.mkdir(out_dir_post_process)
     
@@ -624,6 +633,8 @@ def main():
     
     for dem in dem_list:
         scale_tiff_DEM(dem, out_dir_post_process)
+    print("Finished post processing. Open images to find reference tarp coordinates\
+           and input those into the last part of the workflow for the empirical line fit.")
     
 
                                     
