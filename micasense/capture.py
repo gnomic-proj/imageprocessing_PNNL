@@ -696,7 +696,7 @@ class Capture(object):
 
     # TODO added by ILAN
     # same as alt but does not scale values for UInt16 output
-    def save_bands_as_refl_float(self, out_file_base, sort_by_wavelength=True, photometric='MINISBLACK', lwir=True, vignette_correct=True):
+    def save_bands_as_refl_float(self, out_file_base, sort_by_wavelength=True, photometric='MINISBLACK', lwir=True, vignette_correct=True, spectral_irr=False):
         """
         Output the Images in the Capture object as GTiff image stack.
         :param out_file_name: str system file path
@@ -706,9 +706,13 @@ class Capture(object):
         from osgeo.gdal import GetDriverByName, GDT_Float64
         
         # get the irradiance
-        # .dls_irradiance_raw() gives spectral irradiance
-        # TODO change to .dls_irradiance() to use horizontal irradiance 
-        self.refl_imgs = self.undistorted_reflectance(self.dls_irradiance_raw(), vignette_correct=vignette_correct)
+        # .dls_irradiance_raw() gives spectral irradiance 
+        if spectral_irr:
+            # uses spectral irradiance (.dls_irradiance_raw() method)
+            self.refl_imgs = self.undistorted_reflectance(self.dls_irradiance_raw(), vignette_correct=vignette_correct)
+        else:
+            # uses horizontal irradiance (.dls_irradiance() method)
+            self.refl_imgs = self.undistorted_reflectance(self.dls_irradiance(), vignette_correct=vignette_correct)
 
 
         cols, rows = self.images[0].size()

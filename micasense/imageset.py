@@ -191,7 +191,7 @@ class ImageSet(object):
     def from_grouplist(cls, grouplist, progress_callback=None, use_tqdm=False, exiftool_path=None):
         """
         Create an ImageSet recursively from the files in a directory.
-        :param directory: str system file path
+        :param grouplist: list of image groups
         :param progress_callback: function to report progress to
         :param use_tqdm: boolean True to use tqdm progress bar
         :param exiftool_path: str system file path to exiftool location
