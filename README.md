@@ -1,98 +1,306 @@
-[![Build Status](https://travis-ci.org/micasense/imageprocessing.svg?branch=master)](https://travis-ci.org/micasense/imageprocessing)
+# UAS Image Processing with Micasense and Agisoft
+Ilan Gonzalez-Hirshfeld, Kristian Nelson, Lexie Goldberger, Jerry Tagestad
 
-## MicaSense RedEdge and Altum Image Processing Tutorials
+## Description
 
-This repository includes tutorials and examples for processing MicaSense RedEdge and Altum images into usable information using the Python programming language. RedEdge images captured with firmware 2.1.0 (released June 2017) or newer are required. Altum images captured with all firmware versions are supported. Dual-camera (10-band) capture are also included.
+This codebase was developed to provide semi-automatic Python processing of Micasense Altum imagery to produce othomosaics and DEMs. It is designed for execution from a command line interface. It relies on and is adaptated from the open source Micasense imageprocessing library as well as the Agisoft Metashape Python API. It consists of a workflow implemented through either 4 Python scripts or a more integrated 2 script workflow. The 4 steps are: 1) Preprocess the uncorrected Altum imagery to produce reflectance images using code adapted from the Micasense library; 2) Interactively filter and subdivide images into altitude classes based on user input and supervision together with k-means clustering; 3) Process the imagery from each altitude class into orthomosaics and DEMs; 4) Inspect imagery and apply an empirical line fit correction to the orthomosaics.
 
-The intended audience is researchers and developers with some software development experience that want to do their own image processing. While a number of commercial tools fully support processing RedEdge data into reflectance maps, there are a number of reasons to process your own data, including controlling the entire radiometric workflow (for academic or publication reasons), pre-processing images to be used in a non-radiometric photogrammetry suite, or processing single sets of images without building a larger map.
+***NOTE: A valid Metashape license is required for step 3.***
 
-### What do I need to succeed?
+## Setup
 
-A working knowledge of running Python software on your system and using the command line are both very helpful. We've worked hard to make these tutorials straightforward to run and understand, but the target audience is someone that's looking to learn more about how to process their own imagery and write software to perform more powerful analysis.
+This repo leverages [Micasense imageprocessing](https://github.com/micasense/imageprocessing) for preprocessing and the [Metashape Python module](https://agisoft.freshdesk.com/support/solutions/articles/31000148930-how-to-install-metashape-stand-alone-python-module) for orthomosaic/DEM production. Ad hoc modification of the Micasense library were developed for the particular processing needs of this workflow. Thus, the PNNL fork of that library is used in this implementation: [imageprocessing_PNNL](https://github.com/gnomic-proj/imageprocessing_PNNL). 
 
-You can start today even if you don't have your own RedEdge or Altum. We provide example images, including full flight datasets.
+***NOTE: Make sure you are using the imageprocessing_PNNL fork listed above and not the original Micasense imageprocessing library.***
 
-For a user of RedEdge or Altum that wants a turnkey processing solution, this repository probably is not the best place to start. Instead, consider one of the MicaSense processing partners who provide turnkey software for processing and analysis.
+### 1. Install micasense module from imageprocessing_PNNL fork
 
-### How do I get set up?
+Follow the Micasense installation tutorial found [here](https://github.com/gnomic-proj/imageprocessing_PNNL/blob/master/MicaSense%20Image%20Processing%20Setup.ipynb)
 
-First, [check out the setup tutorial](https://micasense.github.io/imageprocessing/MicaSense%20Image%20Processing%20Setup.html) which will walk you through installing and checking the necessary tools to run the remaining tutorials.
+Once again, make sure you are on the imageprocessing_PNNL fork and looking at the installation tutorial in that repository.
 
-Next, [click here to view the tutorial articles](https://micasense.github.io/imageprocessing/index.html). The set of example notebooks and their outputs can be viewed in your browser without downloading anything or running any code.
+The tutorial takes you through the proper installation steps based on OS as well as verifications that the installation has been successful
 
-For a quick start, make sure you have [git](https://git-scm.com/downloads), [git-lfs](https://git-lfs.github.com/), and [Anaconda](https://www.anaconda.com/) installed.
 
-And then:
+### 2. Install Metashape stand-alone Python module
+
+***NOTE: A valid Metashape license is required for this to be successful.***
+
+1. If the micasense conda environment is not already activated, activate it by running the following command in the appropriate conda terminal:
+
+`conda activate micasense`
+
+2. Follow the Agisoft API installation instructions found [here](https://agisoft.freshdesk.com/support/solutions/articles/31000148930-how-to-install-metashape-stand-alone-python-module)
+
+Make sure you are executing the pip install from within the micasense conda environment that was set up previously.
+
+
+## Workflow
+
+There are two options: the two-script implementation or the 4-script implementation. The two-script implementation simply combines the content of the first 3 scripts of the 4-script implementation into one. It is recommended to start by using the two-script implementation. If issues are encountered, the user may wish to rerun certain steps using some or all of the scripts in the 4-script implementation. 
+
+The documentation first details the two-script approach. If you know you are going to use the 4-script implementation you can skip ahead to the corresponding section below.
+
+### Two-script Implementation
+
+The workflow detailed here involves two scripts, one to perform all the processing excluding the empirical line fit correction, and another to perform the empirical line fit correction. They must be run in that order.
+
+1. Launch the appropriate command line interface and cd into the imageprocessing_PNNL directory.
+Example:
+`cd C:\path\to\repos\imageprocessing_PNNL`
+
+The details of this command will vary based on OS and install location.
+
+2. If the micasense conda environment is not already activated, activate it by running the following command:
+
+`conda activate micasense`
+
+3. Run the WorkflowPt1Complete.py script in the CLI using the arguments detailed below.
+
+This script will perform all processing steps prior to the empirical line fit correction. 
+***NOTE: The altitude filtering portion of the workflow requires user input to proceed.***
+Depending on imagery quantity and processing power, this may occur minutes to several hours after execution start. Once the filtering has started, text will be printed to the CLI alerting you. Grouping will be performed based on the user input values at script execution, or else with default vaules. A plot will be displayed showing the distribution of images and their classification into separate groups. Once examined, you MUST close the plot for the code execution to proceed. You will then be prompted whether or not to change the number of groups by entering the new number of groups followed by ENTER, or to accept the current number of groups used by pressing ENTER with no input to proceed to the next step. The goal is to identify the proper number of groups to ensure that images acquired at roughly the same altitude all belong to a single group (and thus orthomosaic). Otherwise, issues may be encountered in the orthomosaic production step if images from substatially varied acquisition altitudes are used to produce a single orthomosaic.
+
+**Required Inputs**:
+- Full path to the parent directory containg the Micasense Altum imagery subdirectories to be processed. Usually this is a folder named ####SET, for example 0000SET.
+- Full path to the output directory.
+
+**Outputs**
+
+- Corrected reflectance tiles (TIFFs)
+- CSVs and GeoJSONs for each imageSet in the input directory, named like {imageSet number}_imageSet.csv/geojson
+- combined.csv which contains the combined information of the individual imageSet CSVs
+- altitude_classes.csv containing information about which images belong to which altitude classes
+- altitude_classes_figure.png showing the distribution of images by altitude
+- an Agisoft .psx project file and associated folder ending in .files
+- orthos.csv containing information about the orthomosaics
+- an "orthos" directory containing the initial orthomosaics and DEMs as well as PDF reports of the processing
+- a "post_processed" directory within the "orthos" directory that contains scaled (compressed) versions of the orthomosaics
+
 ```
-git clone https://github.com/micasense/imageprocessing
-cd imageprocessing
-conda env create -f micasense_conda_env.yml # or pip install .
-conda activate micasense
-jupyter notebook .
+usage: WorkflowPt1Complete.py [--bbox] [--crop_coords] [--altmin] [--n_alt_levels] [--no_lwir]
+[--no_sbw] [--no_tiled] [--vc] [--spec_irr] parent_dir out_dir
+
+positional arguments:
+  parent_dir      Full path to the parent directory containing the Micasense Altum imagery subdirectories
+  out_dir      output directory
+
+optional arguments:
+ --bbox <ULX> <ULY> <LRX> <LRY>. Bounding box used in preprocessing with coordinates given as: upper-left-X upper-left-Y lower-right-X lower-right-Y
+ --crop_coords <ULX> <ULY> <LRX> <LRY>. Cropping box used after orthomosaic production with coordinates given as: upper-left-X upper-left-Y lower-right-X lower-right-Y
+ --altmin <altmin>, default=100. Minimum altitude for image to be considered (in metadata units)
+ --n_alt_levels <n_alt_levels>, default=1. The number of different flying altitude levels for which to create separate orthomosaics.
+ --no_lwir, do not include long wave IR (thermal) band in output
+ --no_sbw, do not sort bands by wavelength
+ --no_tiled, do not tile the orthomosaics
+ --vc, perform vignetting correction in preprocessing (included in Agisoft processing)
+ --spec_irr, use spectral irradiance instead of horizontal irradiance
+
 ```
 
-### MicaSense Library Usage
+Example usage:
 
-In addition to the tutorials, we've created library code that shows some common transformations, usages, and applications of RedEdge and Altum imagery. In general, these are intended for developers that are familiar with installing and managing python packages and third party software.  The purpose of this code is readability and clarity to help others develop processing workflows, therefore performance may not be optimal.
+`>> python WorkflowPt1Complete.py C:\path\to\images\0000SET C:\path\to\output\directory  --altmin 800`
 
-While this code is similar to an installable Python library (and supports the `python setup.py install` process) the main purpose of this library is one of documentation and education. For this reason, we expect most users to be looking at the source code for understanding or improvement, so they will run the notebooks from the directory that the library was `git clone`d it into. 
+This will create scaled (i.e. compressed) orthomosaics, excluding all imagery at an altitude below 800. Choosing an appropriate minimum altitude can be important to exclude images that were not intended to contribute to final orthomosaic productions (e.g. calibration imagery, imagery acquired during ascent to lowest stable altitude level, etc.). Remember that user input must always be given during the altitude filtering step, even if "n_alt_levels" is specified.
 
-### Running this code
 
-The code in these tutorials consists of two parts. First, the tutorials generally end in `.ipynb` and are the Jupyter notebooks that were used to create the web page tutorials linked above. You can run this code by opening a terminal/iTerm (Linux/macOS) or Anaconda Command Prompt (Windows), navigating to the folder you cloned the git repository into, and running
+***NOTE: Steps from this point forward are only necessary if you are performing an empirical line fit correction using a set of light and dark tarps present in the imagery.***
 
-```bash
-jupyter notebook .
+4. If performing empirical line fit correction, open the orthomosaics in "post_processed" directory and identify the pixel row and column value of tarp locations. If your outputs are tiled orthomosaics (the default), you will have to identify which tile for each orthomosaic contains the tarps.
+
+5. Perform empirical line fit correction to produce final product by running `Workflow_EmpiricalLineFit.py`.
+
+**Required Inputs**:
+- Full path to orthomosaic containing tarps for applying correction. 
+- Full path to the output directory.
+- The row and column value of the pixel most closely centered on the bright tarp
+- The row and column value of the pixel most closely centered on the dark tarp
+
+**Outputs**
+
+- Empirical line fit corrected orthomosaics/tiles (TIFFs)
+- A PNG plot showing the correction values
+
+```
+usage: Workflow_EmpiricalLineFit.py [--center_wavelengths] [--bright_tarp_vals] [--dark_tarp_vals] [--other_tiles] ortho_path out_dir --row_col_bright --row_col_dark
+
+positional arguments:
+  ortho_path      Full path to the parent directory containing the Micasense Altum imagery subdirectories
+  out_dir      output directory
+
+required tick arguments:
+--row_col_bright <ROW> <COLUMN>. The row and column value of the pixel most closely centered on the bright tarp.
+--row_col_dark <ROW> <COLUMN>. The row and column value of the pixel most closely centered on the dark tarp.
+
+optional arguments:
+ --center_wavelengths <BAND_1> <BAND_2> <BAND_3> <BAND_4> <BAND_5>, default=0.47787 0.47805 0.477821 0.477038 0.476231. Τhe center wavelength (nm) as integers for each optical band (in the same order as they are in images to be processed). Default values correspond to the Micasense Altum imager. If needed, more bands can be specified by adding additional values separated by spaces.
+ --bright_tarp_vals <BAND_1> <BAND_2> <BAND_3> <BAND_4> <BAND_5>, default=0.47787 0.47805 0.477821 0.477038 0.476231. Reflectance values of the bright reference tarp for each band. Default values correspond to the Micasense Altum imager. If needed, more bands can be specified by adding additional values separated by spaces.
+ --dark_tarp_vals <BAND_1> <BAND_2> <BAND_3> <BAND_4> <BAND_5>, default=0.111329 0.108774 0.105177 0.103725 0.101346. Reflectance values of the dark reference tarp for each band. Default values correspond to the Micasense Altum imager. If needed, more bands can be specified by adding additional values separated by spaces.
+ --other_tiles <FILENAME>* Filenames (not full paths!) of any other tiles for the same scene as ortho_path. Any number of filenames can be specified separated by a space.
+
 ```
 
-That command should open a web browser window showing the set of files and folder in the repository. Click the `...Setup.ipynb` notebook to get started.
+Example usage:
 
-Second, a set of helper utilities is available in the `micasense` folder that can be used both with these tutorials as well as separtely. 
+`>> python Workflow_EmpiricalLineFit.py C:\path\to\post_processed\ortho_path_with_tarps C:\path\to\output\directory  --row_col_bright 961 1002 --row_col_dark 945 995 --other_tiles other_tile_1.tif other_tile_2.tif other_tile 3.tif`
 
-Note that some of the hyperlinks in the notebooks may give you a 404 Not Found error. This is because the links are setup to allow the list of files above to be accessed on the github.io site.  When running the notebooks, use your jupyter "home" tab to open the different notebooks.
+This will calculate the empirical line fit correction using the orthomosaic tile specifed in the first positional argument and apply it to that image as well as to the orthomosaic tiles indicated by the "other_tiles" argument. The script will use row/column values of 961/1002 and 945/995 to identify bright and dark tarp locations, respectively.
 
-### Contribution guidelines
 
-Find a problem with the tutorial? Please look through the existing issues (open and closed) and if it's new, [create an issue on github](https://github.com/micasense/imageprocessing/issues). 
+### Four-script Implementation
 
-Want to correct an issue or expand library functionality?  Fork the repository, make your fix, and submit a pull request on github.
+***NOTE: This is an alternative and equivalent workflow to the one detailed above. It should be used in its entirety in place of the above workflow (Two-script Implementaion) or else select portions may be used for ad hoc workflow tailoring/troubleshooting.***
 
-Have a question? Please double-check that you're able to run the setup notebook successfully, and resolve any issues with that first.  If you're pulling newer code, it may be necessary in some cases to delete and re-create your `micasense` conda environment to make sure you have all of the expected packages.  
+The workflow detailed here involves four scripts corresponding to the four steps given in the description portion of this document. Running any individual script presupposes and requires the prior execution of any preceding scripts in the workflow.
 
-This code is a community effort and is not supported by MicaSense support. Please don't reach out to MicaSense support for issues with this codebase; instead, work through the above troubleshooting steps and then [create an issue on github](https://github.com/micasense/imageprocessing/issues).
+1. Launch the appropriate command line interface and cd into the imageprocessing_PNNL directory.
+Example:
+`cd C:\path\to\repos\imageprocessing_PNNL`
 
-### Tests
+The details of this command will vary based on OS and install location.
 
-Tests for many library functions are included in the `tests` diretory. Install the `pytest` module through your package manager (e.g. `pip install pytest`) and then tests can be run from the main directory using the command:
+2. If the micasense conda environment is not already activated, activate it by running the following command:
 
-```bash
-pytest
+`conda activate micasense`
+
+3. Run the Workflow_preprocess.py script in the CLI using the arguments detailed below. This script will apply basic corrections to the Altum imagery and convert them to reflectance TIFFs.
+
+
+
+**Required Inputs**:
+- Full path to the parent directory containg the Micasense Altum imagery subdirectories to be processed. Usually this is a folder named ####SET, for example 0000SET.
+- Full path to the output directory.
+
+**Outputs**
+
+- Corrected reflectance tiles (TIFFs)
+- CSVs and GeoJSONs for each imageSet in the input directory, named like {imageSet number}_imageSet.csv/geojson
+- combined.csv which contains the combined information of the individual imageSet CSVs. The CSV path will be printed to CLI, to be used as input for the 'Workflow_agisoft script.
+
+```
+usage: Workflow_preprocess.py [--bbox] [--altmin] [--no_lwir]
+[--no_sbw] [--vc] [--spec_irr] parent_dir out_dir
+
+positional arguments:
+  parent_dir      Full path to the parent directory containing the Micasense Altum imagery subdirectories
+  out_dir      output directory
+
+optional arguments:
+ --bbox <ULX> <ULY> <LRX> <LRY>. Bounding box used in preprocessing with coordinates given as: upper-left-X upper-left-Y lower-right-X lower-right-Y
+ --altmin <altmin>, default=100. Minimum altitude for image to be considered (in metadata units)
+ --no_lwir, do not include long wave IR (thermal) band in output
+ --no_sbw, do not sort bands by wavelength
+ --vc, perform vignetting correction in preprocessing (included in Agisoft processing)
+ --spec_irr, use spectral irradiance instead of horizontal irradiance
+
 ```
 
-Test execution can be relatively slow (2-3 minutes) as there is a lot of image processing occuring in some of the tests, and quite a bit of re-used IO.  To speed up tests, install the `pytest-xdist` plugin using `conda` or `pip` and achieve a significant speed up by running tests in parallel.
+Example usage:
 
-```bash
-pytest -n auto
+`>> python Workflow_preprocess.py C:\path\to\images\0000SET C:\path\to\output\directory  --altmin 800`
+
+This will create reflectance images, excluding all imagery at an altitude below 800.
+
+4. Run the Workflow_agisoft.py script in the CLI using the arguments detailed below. This script will perform altitude grouping/filtering and produce orthomosaics for each altitude level.
+
+***NOTE: The altitude filtering portion of the workflow requires user input to proceed.***
+Depending on imagery quantity and processing power, this may occur minutes to several hours after execution start. Once the filtering has started, text will be printed to the CLI alerting you. Grouping will be performed based on the user input values at script execution, or else with default vaules. A plot will be displayed showing the distribution of images and their classification into separate groups. Once examined, you MUST close the plot for the code execution to proceed. You will then be prompted whether or not to change the number of groups by entering the new number of groups followed by ENTER, or to accept the current number of groups used by pressing ENTER with no input to proceed to the next step. The goal is to identify the proper number of groups to ensure that images acquired at roughly the same altitude all belong to a single group (and thus orthomosaic). Otherwise, issues may be encountered in the orthomosaic production step if images from substatially varied acquisition altitudes are used to produce a single orthomosaic.
+
+**Required Inputs**:
+- Full path to the combined.csv produced in the last step and printed to the CLI.
+- Full path to the output directory.
+
+**Outputs**
+- altitude_classes.csv containing information about which images belong to which altitude classes
+- altitude_classes_figure.png showing the distribution of images by altitude
+- an Agisoft .psx project file and associated folder ending in .files
+- orthos.csv containing information about the orthomosaics. The CSV path will be printed to CLI, to be used as input for the 'Workflow_postprocess script.
+- an "orthos" directory containing the initial orthomosaics and DEMs as well as PDF reports of the processing
+
+```
+usage: WorkflowPt1Complete.py [--altmin] [--n_alt_levels] [--no_tiled] csv_path out_dir
+
+positional arguments:
+  csv_path      Full path to the CSV containing the combined information about the preprocessed images (produced in by previous script)
+  out_dir      output directory
+
+optional arguments:
+ --altmin <altmin>, default=100. Minimum altitude for image to be considered (in metadata units)
+ --n_alt_levels <n_alt_levels>, default=1. The number of different flying altitude levels for which to create separate orthomosaics.
+ --no_tiled, do not tile the orthomosaics
+
 ```
 
-Data used by the tests is included in the `data` folder.
+Example usage:
 
-### For (Tutorial) Developers 
+`>> python Workflow_agisoft.py C:\path\to\CSV\combined.csv C:\path\to\output\directory  --altmin 800 --n_alt_levels 7`
 
-To generate the HTML pages after updating the jupyter notebooks, run the following command in the repository directory:
+This will create unscaled orthomosaics, excluding all imagery at an altitude below 800, and sort them into seven altitude groups. Choosing an appropriate minimum altitude can be important to exclude images that were not intended to contribute to final orthomosaic productions (e.g. calibration imagery, imagery acquired during ascent to lowest stable altitude level, etc.). Remember that user input must always be given during the altitude filtering step, even if `n_alt_levels` is specified.
 
-```bash
-jupyter nbconvert --to html --ExecutePreprocessor.timeout=None --output-dir docs --execute *.ipynb
+5. Run the Workflow_postprocess.py script in the CLI using the arguments detailed below. This script will perform altitude grouping/filtering and produce orthomosaics for each altitude level.
+
+**Required Inputs**:
+- Full path to the orthos.csv produced in the last step and printed to the CLI.
+- Full path to the output directory.
+
+**Outputs**
+- a "post_processed" directory within the "orthos" directory that contains scaled (compressed) versions of the orthomosaics
+
+```
+usage: Workflow_postprocess.py [--crop_coords] csv_path out_dir
+
+positional arguments:
+  csv_path      Full path to the CSV containing the combined information about the orthomosaics (produced in by previous script)
+  out_dir      output directory
+
+optional arguments:
+ --crop_coords <ULX> <ULY> <LRX> <LRY>. Cropping box used with coordinates given as: upper-left-X upper-left-Y lower-right-X lower-right-Y
+
 ```
 
-## License
+Example usage:
 
-The MIT License (MIT)
+`>> python Workflow_agisoft.py C:\path\to\CSV\orthos\ortho.csv C:\path\to\output\directory`
 
-Copyright (c) 2017-2019 MicaSense, Inc.
+This will create scaled orthomosaics and DEMs. If the `crop_coords` were specified, it would also crop the orthomosaics to those coordintes.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+6. If performing empirical line fit correction, open the orthomosaics in "post_processed" directory and identify the pixel row and column value of tarp locations. If your outputs are tiled orthomosaics (the default), you will have to identify which tile for each orthomosaic contains the tarps.
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+7. Perform empirical line fit correction to produce final product by running `Workflow_EmpiricalLineFit.py`.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+**Required Inputs**:
+- Full path to orthomosaic containing tarps for applying correction. 
+- Full path to the output directory.
+- The row and column value of the pixel most closely centered on the bright tarp
+- The row and column value of the pixel most closely centered on the dark tarp
+
+**Outputs**
+
+- Empirical line fit corrected orthomosaics/tiles (TIFFs)
+- A PNG plot showing the correction values
+
+```
+usage: Workflow_EmpiricalLineFit.py [--center_wavelengths] [--bright_tarp_vals] [--dark_tarp_vals] [--other_tiles] ortho_path out_dir --row_col_bright --row_col_dark
+
+positional arguments:
+  ortho_path      Full path to the parent directory containing the Micasense Altum imagery subdirectories
+  out_dir      output directory
+
+required tick arguments:
+--row_col_bright <ROW> <COLUMN>. The row and column value of the pixel most closely centered on the bright tarp.
+--row_col_dark <ROW> <COLUMN>. The row and column value of the pixel most closely centered on the dark tarp.
+
+optional arguments:
+ --center_wavelengths <BAND_1> <BAND_2> <BAND_3> <BAND_4> <BAND_5>, default=0.47787 0.47805 0.477821 0.477038 0.476231. Τhe center wavelength (nm) as integers for each optical band (in the same order as they are in images to be processed). Default values correspond to the Micasense Altum imager. If needed, more bands can be specified by adding additional values separated by spaces.
+ --bright_tarp_vals <BAND_1> <BAND_2> <BAND_3> <BAND_4> <BAND_5>, default=0.47787 0.47805 0.477821 0.477038 0.476231. Reflectance values of the bright reference tarp for each band. Default values correspond to the Micasense Altum imager. If needed, more bands can be specified by adding additional values separated by spaces.
+ --dark_tarp_vals <BAND_1> <BAND_2> <BAND_3> <BAND_4> <BAND_5>, default=0.111329 0.108774 0.105177 0.103725 0.101346. Reflectance values of the dark reference tarp for each band. Default values correspond to the Micasense Altum imager. If needed, more bands can be specified by adding additional values separated by spaces.
+ --other_tiles <FILENAME>* Filenames (not full paths!) of any other tiles for the same scene as ortho_path. Any number of filenames can be specified separated by a space.
+
+```
+
+Example usage:
+
+`>> python Workflow_EmpiricalLineFit.py C:\path\to\post_processed\ortho_path_with_tarps C:\path\to\output\directory  --row_col_bright 961 1002 --row_col_dark 945 995 --other_tiles other_tile_1.tif other_tile_2.tif other_tile 3.tif`
+
+This will calculate the empirical line fit correction using the orthomosaic tile specifed in the first positional argument and apply it to that image as well as to the orthomosaic tiles indicated by the "other_tiles" argument. The script will use row/column values of 961/1002 and 945/995 to identify bright and dark tarp locations, respectively.
