@@ -204,6 +204,8 @@ This will create reflectance images, excluding all imagery at an altitude below 
 
 4. Run the Workflow_agisoft.py script in the CLI using the arguments detailed below. This script will perform altitude grouping/filtering and produce orthomosaics for each altitude level.
 
+***NOTE: A valid Metashape license is required for this to be successful.***
+
 ***NOTE: The altitude filtering portion of the workflow requires user input to proceed.***
 Depending on imagery quantity and processing power, this may occur minutes to several hours after execution start. Once the filtering has started, text will be printed to the CLI alerting you. Grouping will be performed based on the user input values at script execution, or else with default vaules. A plot will be displayed showing the distribution of images and their classification into separate groups. Once examined, you MUST close the plot for the code execution to proceed. You will then be prompted whether or not to change the number of groups by entering the new number of groups followed by ENTER, or to accept the current number of groups used by pressing ENTER with no input to proceed to the next step. The goal is to identify the proper number of groups to ensure that images acquired at roughly the same altitude all belong to a single group (and thus orthomosaic). Otherwise, issues may be encountered in the orthomosaic production step if images from substatially varied acquisition altitudes are used to produce a single orthomosaic.
 
