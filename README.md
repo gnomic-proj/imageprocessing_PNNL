@@ -244,17 +244,15 @@ This will create unscaled orthomosaics, excluding all imagery at an altitude bel
 
 **Required Inputs**:
 - Full path to the orthos.csv produced in the last step and printed to the CLI.
-- Full path to the output directory.
 
 **Outputs**
 - a `post_processed` directory within the `orthos` directory that contains scaled (compressed) versions of the orthomosaics and DEMs.
 
-#TODO 23-1-18 NEED TO CHANGE THIS TO NOT HAVE out_dir (to reflect code) and rewrite docs to match
+```
 usage: Workflow_postprocess.py [--crop_coords] csv_path out_dir
 
 positional arguments:
   csv_path     Full path to the CSV containing the combined information about the orthomosaics (produced in by previous script)
-  out_dir      output directory
 
 optional arguments:
  --crop_coords <ULX> <ULY> <LRX> <LRY>. Cropping box used with coordinates given as: upper-left-X upper-left-Y lower-right-X lower-right-Y
@@ -263,7 +261,7 @@ optional arguments:
 
 Example usage:
 
-`>> python Workflow_postprocess.py C:\path\to\CSV\orthos\ortho.csv C:\path\to\output\directory`
+`>> python Workflow_postprocess.py C:\path\to\CSV\orthos\ortho.csv`
 
 This will create scaled orthomosaics and DEMs. If the `crop_coords` were specified, it would also crop the orthomosaics to those coordintes.
 
