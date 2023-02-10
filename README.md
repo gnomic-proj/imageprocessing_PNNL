@@ -221,7 +221,7 @@ Depending on imagery quantity and processing power, this may occur minutes to se
 - an "orthos" directory containing the initial orthomosaics and DEMs as well as PDF reports of the processing
 
 ```
-usage: WorkflowPt1Complete.py [--altmin] [--n_alt_levels] [--no_tiled] csv_path out_dir
+usage: Workflow_agisoft.py [--altmin] [--n_alt_levels] [--no_tiled] csv_path out_dir
 
 positional arguments:
   csv_path     Full path to the CSV containing the combined information about the preprocessed images (produced in by previous script)
@@ -249,7 +249,7 @@ This will create unscaled orthomosaics, excluding all imagery at an altitude bel
 **Outputs**
 - a `post_processed` directory within the `orthos` directory that contains scaled (compressed) versions of the orthomosaics and DEMs.
 
-```
+#TODO 23-1-18 NEED TO CHANGE THIS TO NOT HAVE out_dir (to reflect code) and rewrite docs to match
 usage: Workflow_postprocess.py [--crop_coords] csv_path out_dir
 
 positional arguments:
@@ -263,7 +263,7 @@ optional arguments:
 
 Example usage:
 
-`>> python Workflow_agisoft.py C:\path\to\CSV\orthos\ortho.csv C:\path\to\output\directory`
+`>> python Workflow_postprocess.py C:\path\to\CSV\orthos\ortho.csv C:\path\to\output\directory`
 
 This will create scaled orthomosaics and DEMs. If the `crop_coords` were specified, it would also crop the orthomosaics to those coordintes.
 

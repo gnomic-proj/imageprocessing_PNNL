@@ -675,7 +675,7 @@ def scale_tiff_DEM(tiff_path, out_dir_post_process):
     YSize = ds.GetRasterBand(1).YSize
     
     driver = gdal.GetDriverByName('GTiff')
-    ds_out = driver.Create(path_out, XSize, YSize, 1, dtype)
+    ds_out = driver.Create(path_out, XSize, YSize, 1, dtype, options=['BIGTIFF=YES'])
     ds_out.SetProjection(ds.GetProjection())
     ds_out.SetGeoTransform(ds.GetGeoTransform())
     
@@ -792,7 +792,16 @@ def agisoft_processing(csv_path, out_dir, altmin=0, n_alt_levels=1, tiled=True):
     ortho_dir, ortho_list, dem_list = agisoft_make_ortho(out_dir, tiled=tiled)
     print("Finished Agisoft orthomosaic production.")
     
-    df = pd.DataFrame({"ortho_dir": ortho_dir, "orthos": ortho_list, "dems": dem_list})
+    # make dem_list of same length as ortho_list if tiled used
+    if len(ortho_list) > len(dem_list):
+        diff = len(ortho_list) - len(dem_list)
+        nan_list = [np.nan] * diff
+        dem_list = dem_list + nan_list
+    
+    # make list of repeating ortho_dir to match length of other lists
+    ortho_dir_list = [ortho_dir] * len(ortho_list)
+    
+    df = pd.DataFrame({"ortho_dir": ortho_dir_list, "orthos": ortho_list, "dems": dem_list})
     csv_out_path = os.path.join(out_dir, "orthos.csv")
     df.to_csv(csv_out_path, index=False)
     

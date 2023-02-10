@@ -30,8 +30,8 @@ parser = argparse.ArgumentParser()
 # required args
 parser.add_argument('ortho_path', help="path for orthomosaic")
 parser.add_argument('output_directory', help="output directory")
-parser.add_argument('row_col_bright', default=None, nargs=2, type=int, help="row and column (in that order) of the center pixel for bright reference")
-parser.add_argument('row_col_dark', default=None, nargs=2, type=int, help="row and column (in that order) of the center pixel for dark reference")
+parser.add_argument('--row_col_bright', default=None, nargs=2, type=int, help="row and column (in that order) of the center pixel for bright reference")
+parser.add_argument('--row_col_dark', default=None, nargs=2, type=int, help="row and column (in that order) of the center pixel for dark reference")
 
 # optional args
 parser.add_argument('--center_wavelengths', default=[475, 560, 668, 717, 840], nargs="+", type=int, help="the center wavelength for each optical band (in the same order as they are in images to be processed)")
@@ -63,6 +63,7 @@ def empirical_line_fit(image_path,
                        bright_tarp_vals,
                        row_col_bright=None, row_col_dark=None, tiles=None):
     
+    base_path = os.path.dirname(image_path)
     image_basename = [os.path.basename(image_path)]  # make list for loop later
     if tiles:
         tiles = image_basename + tiles
@@ -85,7 +86,8 @@ def empirical_line_fit(image_path,
     # initiate loop over the 5 optical bands
     for i in range(1, 6):
         # get band and its values
-        arr = ds.GetRasterBand(i).ReadAsArray()
+        # divide by 10,000 b/c input TIFFs are already scaled by that factor
+        arr = ds.GetRasterBand(i).ReadAsArray() * .0001
         # extract 3x3 array centered on the tarps and take mean pixels
         bright_ref = arr[row_bright-1: row_bright+2, col_bright-1: col_bright+2]
         bright_ref_mean = np.mean(bright_ref)
@@ -149,6 +151,9 @@ def empirical_line_fit(image_path,
     ##########################################################
     # apply ELF to image and output as new scaled GeoTIFF
     for tile in tiles:
+        if tile != tiles[0]:
+            image_path_in = os.path.join(base_path, tile)
+            ds = gdal.Open(image_path_in)
         image_path_out = os.path.join(out_dir, tile[:-4] + '_EMP.tif')
         dtype = gdal.GDT_UInt16
         XSize = ds.GetRasterBand(1).XSize
@@ -161,19 +166,19 @@ def empirical_line_fit(image_path,
         
         
         for i in range(1,7):
+            inband = ds.GetRasterBand(i)
+            outband = ds_out.GetRasterBand(i)
+
             # define gain and offset; i - 1 b/c gdal doesn't use 0 indexing
             if i < 6:  # needed because thermal band (6) is not included 
                 gain = models[i-1][0]
                 offset = models[i-1][1]
             
-            inband = ds.GetRasterBand(i)
-            outband = ds_out.GetRasterBand(i)
-            
-            if i <= 5:
                 # set scale for optical bands to 1000 for compression
                 outband.SetScale(.0001)
                 outband.SetOffset(0)
-                dta = inband.ReadAsArray()
+                #  by 10,000 b/c input TIFFs are already scaled by that factor
+                dta = inband.ReadAsArray() * .0001
                 dta_ma = ma.masked_values(dta, 1.)
                 # change values that were 1.0 in original to no data value
                 # apply gain and offset and scale
@@ -184,19 +189,22 @@ def empirical_line_fit(image_path,
                 outband.WriteArray(dta_EMP_scaled)
         
             elif i == 6:
-                # set scale for thermal to 100 for compression
+                # # set scale for thermal to 100 for compression
                 outband.SetScale(.01)
                 outband.SetOffset(0)
                 dta = inband.ReadAsArray()
-                dta_ma = ma.masked_values(dta, 1.)
-                # change values that were 1.0 in original to no data value
-                # apply scale (no empirical line fit)
-                dta_ma_scaled = dta_ma * 100
-                dta_scaled = dta_ma_scaled.filled(fill_value=65535)
+                outband.WriteArray(dta)
+                
+                # this commented out section is only needed if input data is not already scaled
+                # dta_ma = ma.masked_values(dta, 1.)
+                # # change values that were 1.0 in original to no data value
+                # # apply scale (no empirical line fit)
+                # dta_ma_scaled = dta_ma * 100
+                # dta_scaled = dta_ma_scaled.filled(fill_value=65535)
         
                 
-                # write
-                outband.WriteArray(dta_scaled)
+                # # write
+                # outband.WriteArray(dta_scaled)
             
             
             # set no data value
