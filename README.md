@@ -284,7 +284,7 @@ This will create scaled orthomosaics and DEMs. If the `crop_coords` were specifi
 usage: Workflow_EmpiricalLineFit.py [--center_wavelengths] [--bright_tarp_vals] [--dark_tarp_vals] [--other_tiles] ortho_path out_dir --row_col_bright --row_col_dark
 
 positional arguments:
-  ortho_path     Full path to the parent directory containing the Micasense Altum imagery subdirectories
+  ortho_path     Full path to the orthomosaic containing the calibration tarps
   out_dir        output directory
 
 required tick arguments:
