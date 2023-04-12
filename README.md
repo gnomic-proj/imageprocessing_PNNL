@@ -47,7 +47,7 @@ The workflow detailed here involves two scripts: one to perform all the processi
 
 1. Launch the appropriate CLI and cd into the camspec-air-processing directory.
 Example:
-`cd C:\path\to\repos\imageprocessing_PNNL`
+`cd C:\path\to\repos\camspec-air-processing`
 
 The details of this command will vary based on OS and install location.
 
