@@ -9,15 +9,15 @@ This codebase was developed to provide semi-automatic Python processing of Micas
 
 ## Setup
 
-This repo leverages [Micasense imageprocessing](https://github.com/micasense/imageprocessing) for preprocessing and the [Metashape Python module](https://agisoft.freshdesk.com/support/solutions/articles/31000148930-how-to-install-metashape-stand-alone-python-module) for orthomosaic/DEM production. Ad hoc modifications of the Micasense library were developed for the particular processing needs of this workflow. Thus, the PNNL fork of that library is used in this implementation: [imageprocessing_PNNL](https://github.com/gnomic-proj/imageprocessing_PNNL). 
+This repo leverages [Micasense imageprocessing](https://github.com/micasense/imageprocessing) for preprocessing and the [Metashape Python module](https://agisoft.freshdesk.com/support/solutions/articles/31000148930-how-to-install-metashape-stand-alone-python-module) for orthomosaic/DEM production. Ad hoc modifications of the Micasense library were developed for the particular processing needs of this workflow. Thus, the PNNL fork of that library is used in this implementation: [camspec-air-processing](https://github.com/ARM-DOE/camspec-air-processing.git). 
 
-***NOTE: Make sure you are using the imageprocessing_PNNL fork listed above and not the original Micasense imageprocessing library.***
+***NOTE: Make sure you are using the camspec-air-processing fork listed above and not the original Micasense imageprocessing library.***
 
-### 1. Install micasense module from imageprocessing_PNNL fork
+### 1. Install micasense module from camspec-air-processing fork
 
-Follow the Micasense installation tutorial found [here](https://github.com/gnomic-proj/imageprocessing_PNNL/blob/master/MicaSense%20Image%20Processing%20Setup.ipynb).
+Follow the Micasense installation tutorial found [here](https://github.com/ARM-DOE/camspec-air-processing/blob/master/MicaSense%20Image%20Processing%20Setup.ipynb).
 
-Once again, make sure you are on the imageprocessing_PNNL fork and looking at the installation tutorial in that repository.
+Once again, make sure you are on the camspec-air-processing fork and looking at the installation tutorial in that repository.
 
 The tutorial takes you through the proper installation steps based on OS as well as verifications that the installation has been successful.
 
@@ -45,7 +45,7 @@ This documentation first details the two-script approach. If you know you are go
 
 The workflow detailed here involves two scripts: one to perform all the processing excluding the empirical line fit correction and another to perform the empirical line fit correction. They must be run in that order.
 
-1. Launch the appropriate CLI and cd into the imageprocessing_PNNL directory.
+1. Launch the appropriate CLI and cd into the camspec-air-processing directory.
 Example:
 `cd C:\path\to\repos\imageprocessing_PNNL`
 
@@ -154,9 +154,9 @@ This will calculate the empirical line fit correction using the orthomosaic tile
 
 The workflow detailed here involves four scripts corresponding to the four steps given in the description portion of this document. Running any individual script presupposes and requires the prior execution of any preceding scripts in the workflow.
 
-1. Launch the appropriate command line interface and cd into the imageprocessing_PNNL directory.
+1. Launch the appropriate command line interface and cd into the camspec-air-processing directory.
 Example:
-`cd C:\path\to\repos\imageprocessing_PNNL`
+`cd C:\path\to\repos\camspec-air-processing`
 
 The details of this command will vary based on OS and install location.
 
