@@ -100,7 +100,7 @@ optional arguments:
 
 Example usage:
 
-`>> python WorkflowPt1Complete.py C:\path\to\images\0000SET C:\path\to\output\directory  --altmin 800`
+`>> python WorkflowPt1Complete.py C:\path\to\images\ C:\path\to\output\directory  --altmin 800`
 
 This will create scaled (i.e. compressed) orthomosaics, excluding all imagery at an altitude below 800. Choosing an appropriate minimum altitude can be important to exclude images that were not intended to contribute to final orthomosaic productions (e.g. calibration imagery, imagery acquired during ascent to lowest stable altitude level, etc.). Remember that user input must always be given during the altitude filtering step, even if "n_alt_levels" is specified.
 
